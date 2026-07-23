@@ -1,0 +1,52 @@
+name: Deploy GAZMER Game
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Kodu al
+        uses: actions/checkout@v6
+
+      - name: Node.js kur
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Paketleri kur
+        run: npm ci
+
+      - name: Oyunu derle
+        run: npm run build
+
+      - name: GitHub Pages'i hazırla
+        uses: actions/configure-pages@v5
+
+      - name: Derlenmiş oyunu yükle
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./dist
+
+      - name: Yayınla
+        id: deployment
+        uses: actions/deploy-pages@v4
