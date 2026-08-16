@@ -12,9 +12,11 @@ const DEFAULT_TEXT_STYLE = {
   fontFamily: 'Trebuchet MS, sans-serif'
 };
 
-// Phaser Text nesnelerini retina / yüksek DPI ekranlarda keskin tutar.
-// 2x sınırı, özellikle 4K mobil cihazlarda bellek kullanımının büyümesini önler.
-const getTextResolution = () => Phaser.Math.Clamp(window.devicePixelRatio || 1, 1, 2);
+// Telefonların 2.625x / 3x gibi yoğun ekranlarında canvas'ın tarayıcı
+// tarafından büyütülüp bulanıklaştırılmasını önler. 2.5x sınırı görüntüyü
+// cihazın doğal çözünürlüğüne yaklaştırırken GPU bellek kullanımını dengeler.
+const getRenderScale = () => Phaser.Math.Clamp(window.devicePixelRatio || 1, 1, 2.5);
+const getTextResolution = getRenderScale;
 
 if (!Phaser.GameObjects.GameObjectFactory.prototype.__gazmerTextPatched) {
   const originalText = Phaser.GameObjects.GameObjectFactory.prototype.text;
@@ -69,6 +71,29 @@ const gameContainer = document.getElementById('game-container');
 const game = new Phaser.Game(config);
 window.game = game;
 
+// Phaser 3'ün RESIZE modu canvas'ı CSS piksel boyutunda oluşturur. Burada
+// oyun koordinatlarını CSS pikselinde bırakıp yalnızca çizim yüzeyini DPR ile
+// büyütüyoruz. Böylece arayüzün boyutu değişmeden görseller ve şekiller keskin
+// çizilir; ScaleManager da dokunma koordinatlarını doğru ölçeğe dönüştürür.
+const originalUpdateScale = game.scale.updateScale.bind(game.scale);
+game.scale.updateScale = function updateHighDpiScale() {
+  originalUpdateScale();
+
+  if (this.scaleMode !== Phaser.Scale.RESIZE || !this.canvas) return;
+
+  const logicalWidth = Math.max(1, Math.round(this.gameSize.width));
+  const logicalHeight = Math.max(1, Math.round(this.gameSize.height));
+  const renderScale = getRenderScale();
+  const physicalWidth = Math.max(1, Math.round(logicalWidth * renderScale));
+  const physicalHeight = Math.max(1, Math.round(logicalHeight * renderScale));
+
+  this.baseSize.setSize(physicalWidth, physicalHeight);
+  this.canvas.width = physicalWidth;
+  this.canvas.height = physicalHeight;
+  this.canvas.style.width = `${logicalWidth}px`;
+  this.canvas.style.height = `${logicalHeight}px`;
+};
+
 let refreshFrame = 0;
 let lastTextResolution = getTextResolution();
 
@@ -86,6 +111,27 @@ const refreshTextResolution = () => {
   });
 };
 
+const syncActiveCameras = () => {
+  const renderScale = getRenderScale();
+  const physicalWidth = game.scale.baseSize.width;
+  const physicalHeight = game.scale.baseSize.height;
+
+  game.scene.getScenes(true).forEach((scene) => {
+    scene.cameras?.cameras.forEach((camera) => {
+      if (camera.width !== physicalWidth || camera.height !== physicalHeight) {
+        camera.setSize(physicalWidth, physicalHeight);
+      }
+      if (camera.zoom !== renderScale) {
+        camera.setZoom(renderScale);
+      }
+    });
+  });
+};
+
+// Yeni bir sahne açıldığında kamerası da ilk çizimden önce yüksek DPI çizim
+// yüzeyine eşitlenir. Boyutlar zaten doğruysa bu kontrol hiçbir işlem yapmaz.
+game.events.on(Phaser.Core.Events.PRE_RENDER, syncActiveCameras);
+
 // Pencere, yön, tarayıcı tam ekranı ve parent ölçüsü değişikliklerini tek
 // animasyon karesinde birleştirir. refresh(), RESIZE modunun güncel parent
 // ölçülerini sahnelere Phaser.Scale.Events.RESIZE olarak iletmesini sağlar.
@@ -94,6 +140,7 @@ const queueScaleRefresh = () => {
   refreshFrame = window.requestAnimationFrame(() => {
     if (!game.scale?.canvas) return;
     game.scale.refresh();
+    syncActiveCameras();
     refreshTextResolution();
   });
 };

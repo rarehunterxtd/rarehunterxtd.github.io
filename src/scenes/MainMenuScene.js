@@ -81,9 +81,14 @@ export default class MainMenuScene extends Phaser.Scene {
 
     const redraw = () => {
       const { x, y, width, height } = state;
+      const phoneCard = width < 220;
       const radius = Math.min(22, height * 0.18);
       const left = x - width / 2;
       const top = y - height / 2;
+      const iconInset = phoneCard ? 10 : 14;
+      const iconColumnWidth = phoneCard ? 54 : 66;
+      const iconCenterX = left + iconInset + iconColumnWidth / 2;
+      const iconVerticalInset = phoneCard ? 10 : 14;
       shadow.clear().fillStyle(UI_COLORS.shadow, completed ? 0.07 : 0.13)
         .fillRoundedRect(left, top + (state.over ? 4 : 7), width, height, radius);
       surface.clear();
@@ -92,18 +97,24 @@ export default class MainMenuScene extends Phaser.Scene {
       surface.lineStyle(2, completed ? 0xb8d8c6 : game.color, completed ? 0.75 : 0.42);
       surface.strokeRoundedRect(left, top - (state.over ? 3 : 0), width, height, radius);
       surface.fillStyle(completed ? 0x8fbda2 : game.color, completed ? 0.22 : 0.13);
-      surface.fillRoundedRect(left + 14, top + 14 - (state.over ? 3 : 0), 66, height - 28, Math.min(17, radius));
+      surface.fillRoundedRect(
+        left + iconInset,
+        top + iconVerticalInset - (state.over ? 3 : 0),
+        iconColumnWidth,
+        height - iconVerticalInset * 2,
+        Math.min(phoneCard ? 14 : 17, radius)
+      );
 
       if (game.key === 'game3') {
         icon.clear();
         pngIcon.setVisible(true);
-        const iconSize = Math.min(50, Math.max(32, height * 0.38));
-        pngIcon.setPosition(left + 47, y - (state.over ? 3 : 0)).setDisplaySize(iconSize, iconSize);
+        const iconSize = Math.min(phoneCard ? 42 : 50, Math.max(30, height * 0.36));
+        pngIcon.setPosition(iconCenterX, y - (state.over ? 3 : 0)).setDisplaySize(iconSize, iconSize);
         return;
       }
 
       pngIcon.setVisible(false);
-      this._drawCardIcon(icon, game.icon, left + 47, y - (state.over ? 3 : 0), completed ? UI_COLORS.greenDark : game.color, height);
+      this._drawCardIcon(icon, game.icon, iconCenterX, y - (state.over ? 3 : 0), completed ? UI_COLORS.greenDark : game.color, height);
     };
 
     {
@@ -175,42 +186,54 @@ export default class MainMenuScene extends Phaser.Scene {
   _positionCardText(card) {
     const { state, number, title, subtitle, action } = card;
     const left = state.x - state.width / 2;
-    const textX = left + Math.min(98, Math.max(82, state.width * 0.36));
+    const phoneCard = state.width < 220;
+    const textX = phoneCard
+      ? left + 72
+      : left + Math.min(98, Math.max(82, state.width * 0.36));
     const compact = state.height < 105;
     const narrow = state.width < 250;
-    number.setPosition(textX, state.y - state.height * 0.27).setFontSize(compact ? 10 : 12);
-    title.setPosition(textX, state.y + (narrow ? -2 : -3)).setFontSize(compact || narrow ? 16 : 19);
-    title.setWordWrapWidth(Math.max(70, state.width - (textX - left) - 18));
+    number.setPosition(textX, state.y - state.height * 0.29).setFontSize(phoneCard ? 9 : compact ? 10 : 12);
+    title
+      .setPosition(textX, state.y - (phoneCard ? 4 : narrow ? 2 : 3))
+      .setFontSize(phoneCard ? 14 : compact || narrow ? 16 : 19)
+      .setLineSpacing(phoneCard ? -2 : 0);
+    title.setWordWrapWidth(Math.max(72, state.width - (textX - left) - (phoneCard ? 10 : 18)), true);
     subtitle.setVisible(!narrow).setPosition(textX, state.y + state.height * 0.25).setFontSize(compact ? 11 : 13);
     subtitle.setWordWrapWidth(Math.max(70, state.width - (textX - left) - 70));
-    action.setPosition(state.x + state.width / 2 - 17, state.y + state.height * (narrow ? 0.31 : 0.25)).setFontSize(compact ? 11 : 13);
+    action
+      .setPosition(state.x + state.width / 2 - (phoneCard ? 10 : 17), state.y + state.height * (phoneCard ? 0.33 : narrow ? 0.31 : 0.25))
+      .setFontSize(phoneCard ? 10 : compact ? 11 : 13);
   }
 
   _positionMenu(width, height) {
     this.backdrop?.resize(width, height);
+    const phoneLayout = width < 560;
     const compactHeight = height < 650;
-    const top = compactHeight ? 22 : Math.max(28, height * 0.055);
-    this.header.eyebrow.setPosition(width / 2, top).setFontSize(width < 520 ? 10 : 13);
-    this.header.heading.setPosition(width / 2, top + (compactHeight ? 28 : 38)).setFontSize(width < 520 ? 25 : compactHeight ? 28 : 34);
+    const top = phoneLayout ? Math.max(18, height * 0.03) : compactHeight ? 22 : Math.max(28, height * 0.055);
+    this.header.eyebrow.setPosition(width / 2, top).setFontSize(phoneLayout ? 9 : width < 520 ? 10 : 13);
+    this.header.heading
+      .setPosition(width / 2, top + (phoneLayout ? 30 : compactHeight ? 28 : 38))
+      .setFontSize(phoneLayout ? 23 : width < 520 ? 25 : compactHeight ? 28 : 34);
     this.header.subheading
-      .setPosition(width / 2, top + (compactHeight ? 61 : 80))
-      .setFontSize(width < 520 ? 13 : 16)
-      .setWordWrapWidth(Math.min(680, width - 36));
+      .setPosition(width / 2, top + (phoneLayout ? 66 : compactHeight ? 61 : 80))
+      .setFontSize(phoneLayout ? 12 : width < 520 ? 13 : 16)
+      .setWordWrapWidth(Math.min(680, width - (phoneLayout ? 24 : 36)));
 
     const cols = width >= 720 ? 3 : width >= 340 ? 2 : 1;
     const rows = Math.ceil(this.cards.length / cols);
-    const sideMargin = Phaser.Math.Clamp(width * 0.055, 16, 64);
-    const gapX = Phaser.Math.Clamp(width * 0.022, 10, 24);
-    const gridTop = top + (compactHeight ? 91 : 118);
-    const bottomMargin = compactHeight ? 14 : 28;
-    const gapY = Phaser.Math.Clamp(height * 0.022, 9, 20);
+    const sideMargin = phoneLayout ? 12 : Phaser.Math.Clamp(width * 0.055, 16, 64);
+    const gapX = phoneLayout ? 8 : Phaser.Math.Clamp(width * 0.022, 10, 24);
+    const gridTop = top + (phoneLayout ? 98 : compactHeight ? 91 : 118);
+    const bottomMargin = phoneLayout || compactHeight ? 14 : 28;
+    const gapY = phoneLayout ? 10 : Phaser.Math.Clamp(height * 0.022, 9, 20);
     const cardWidth = Math.min(360, (width - sideMargin * 2 - gapX * (cols - 1)) / cols);
     const availableHeight = Math.max(180, height - gridTop - bottomMargin - gapY * (rows - 1));
-    const cardHeight = Math.min(150, availableHeight / rows);
+    const cardHeight = Math.min(phoneLayout ? 142 : 150, availableHeight / rows);
     const gridWidth = cardWidth * cols + gapX * (cols - 1);
     const gridHeight = cardHeight * rows + gapY * (rows - 1);
     const startX = width / 2 - gridWidth / 2 + cardWidth / 2;
-    const startY = gridTop + Math.max(0, (availableHeight - gridHeight) / 2) + cardHeight / 2;
+    const centeredOffset = Math.max(0, (availableHeight - gridHeight) / 2);
+    const startY = gridTop + (phoneLayout ? Math.min(36, centeredOffset) : centeredOffset) + cardHeight / 2;
     const remainder = this.cards.length % cols;
     const lastRowCount = remainder === 0 ? cols : remainder;
 

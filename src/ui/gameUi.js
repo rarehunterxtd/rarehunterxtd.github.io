@@ -130,7 +130,6 @@ export function createButton(scene, {
     fontStyle: 'bold',
     wordWrap: { width: Math.max(20, width - 28) }
   }).setOrigin(0.5).setDepth(depth + 2);
-  text.setResolution(2);
   const animatedTargets = [faceGraphics, text];
 
   const state = {
@@ -329,7 +328,6 @@ export function createButton(scene, {
       color: textColor,
       fontStyle: 'bold'
     }).setOrigin(0.5).setDepth(depth + 2);
-    iconText.setResolution(2);
     animatedTargets.push(iconText);
     const originalSetPosition = bg.setPosition;
     bg.setPosition = (nextX, nextY) => {
