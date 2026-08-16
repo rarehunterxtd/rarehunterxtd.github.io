@@ -9,11 +9,12 @@ const showSafeAngles = false;
 const TIMER_SECONDS = 30;
 const NEEDLE_MIN = -90;
 const NEEDLE_MAX = 90;
+const REQUIRED_SAFE_SECONDS = 20;
+const REQUIRED_INPUTS = 4;
 
 export default class MiniGame5Scene extends Phaser.Scene {
   constructor() {
     super('MiniGame5');
-    this.boiler = null;
     this.valve = null;
     this.pressureMeter = null;
     this.needle = null;
@@ -34,16 +35,18 @@ export default class MiniGame5Scene extends Phaser.Scene {
     this.countdown = TIMER_SECONDS;
     this.angularVelocity = 0;
     this.manualForce = 0;
-    this.startedAt = 0;
     this.lastDisplayedSecond = TIMER_SECONDS;
+    this.elapsedTime = 0;
+    this.safeElapsed = 0;
+    this.inputCount = 0;
+    this.inputCooldown = 0;
+    this.resultAction = 'restart';
+    this.transitioning = false;
     this.cursors = null;
     this.mainMenuButton = null;
   }
 
   preload() {
-    this.load.image('game5_boiler_off', assetUrl('kombi_off.png'));
-    this.load.image('game5_boiler_true', assetUrl('kombi_true.png'));
-    this.load.image('game5_boiler_wrong', assetUrl('kombi_wrong.png'));
     this.load.image('game5_valve', assetUrl('vana.png'));
     this.load.image('game5_pressure_meter', assetUrl('pressure_meter.png'));
     this.load.image('game5_needle', assetUrl('ibre.png'));
@@ -56,14 +59,20 @@ export default class MiniGame5Scene extends Phaser.Scene {
     this.currentAngle = 0;
     this.angularVelocity = 0;
     this.manualForce = 0;
+    this.elapsedTime = 0;
+    this.safeElapsed = 0;
+    this.inputCount = 0;
+    this.inputCooldown = 0;
+    this.resultAction = 'restart';
+    this.transitioning = false;
 
     this.backdrop = addBackdrop(this, { color: 0xf3f0fb, accent: UI_COLORS.lavender, secondary: UI_COLORS.teal, depth: -200 });
     this.bgFill = this.add.rectangle(0, 0, width, height, 0xf3f0fb, 0.3).setOrigin(0).setDepth(-100);
     this.titleText = this.add.text(20, 18, 'OYUN 05  •  BASINÇ USTASI', { fontSize: '14px', color: '#564695', fontStyle: 'bold' }).setDepth(50);
     const menuButton = createButton(this, {
       x: width - 92, y: 34, width: 164, height: 46, label: '←  Ana Menü',
-      fill: UI_COLORS.navy, stroke: 0x9ccbd2, fontSize: 15, depth: 300,
-      onClick: () => this.scene.start('MainMenu')
+      fill: UI_COLORS.navy, stroke: 0x9ccbd2, fontSize: 15, depth: 1200,
+      onClick: () => this._goToMainMenu()
     });
     this.mainMenuButton = { rect: menuButton.bg, txt: menuButton.text };
 
@@ -77,8 +86,7 @@ export default class MiniGame5Scene extends Phaser.Scene {
       fontStyle: 'bold'
     }).setOrigin(0.5, 0).setDepth(60);
 
-    this.boiler = this.add.image(width / 2, height / 2, 'game5_boiler_off').setOrigin(0.5).setDepth(4);
-    this.valve = this.add.image(width / 2, height / 2 + 140, 'game5_valve').setOrigin(0.5).setDepth(6);
+    this.valve = this.add.image(width / 2, height / 2 + 140, 'game5_valve').setOrigin(0.5).setDepth(12);
     this.pressureMeter = this.add.image(width / 2, height / 2, 'game5_pressure_meter').setOrigin(0.5).setDepth(10);
     this.needle = this.add.image(width / 2, height / 2, 'game5_needle').setOrigin(0.5, 1).setDepth(20);
     if (showSafeAngles) {
@@ -95,7 +103,6 @@ export default class MiniGame5Scene extends Phaser.Scene {
     this.rightButton = this._createButton(width / 2 + 190, height / 2, '▶', () => this._nudgeNeedle(10));
 
     this.cursors = this.input.keyboard.createCursorKeys();
-    this.startedAt = performance.now();
     this.lastDisplayedSecond = TIMER_SECONDS;
 
     this.overlay = this.add.rectangle(0, 0, width, height, 0x000000, 0.68)
@@ -125,11 +132,8 @@ export default class MiniGame5Scene extends Phaser.Scene {
     this.panelActionText = actionButton.text;
 
     this.panelActionBg.on('pointerup', () => {
-      if (this.isFinished) {
-        this.scene.start('MainMenu');
-      } else {
-        this.scene.restart();
-      }
+      if (this.resultAction === 'menu') this._goToMainMenu();
+      else this._restartGame();
     });
 
     this._resizeHandler = (gameSize) => {
@@ -151,8 +155,9 @@ export default class MiniGame5Scene extends Phaser.Scene {
   _nudgeNeedle(delta) {
     if (this.isFinished) return;
     this._animateValve(Math.sign(delta));
-    this.angularVelocity += delta * 2.15;
-    this.manualForce += delta * 0.7;
+    this.inputCount += 1;
+    this.angularVelocity += delta * 0.9;
+    this.manualForce += delta * 0.35;
   }
 
   _animateValve(direction) {
@@ -170,13 +175,17 @@ export default class MiniGame5Scene extends Phaser.Scene {
   }
 
   _stepPhysics(deltaSeconds, elapsedSeconds) {
-    const destabilizingForce = this.currentAngle * 0.075;
-    const naturalWobble = Math.sin(elapsedSeconds * 1.35) * 5.2;
+    // Basınç iki farklı ritimde sürekli değişir. Mevcut açı da dışarı doğru
+    // küçük bir ivme üretir; oyuncu yön tuşlarıyla düzenli karşılık vermelidir.
+    const pressureWave = Math.sin(elapsedSeconds * 1.08) * 18
+      + Math.sin(elapsedSeconds * 2.37 + 1.15) * 10
+      + Math.cos(elapsedSeconds * 0.41 + 0.55) * 7;
+    const destabilizingForce = this.currentAngle * 0.08;
     const inputForce = this.manualForce;
 
-    this.angularVelocity += (destabilizingForce + naturalWobble + inputForce) * deltaSeconds;
-    this.angularVelocity *= Math.exp(-0.48 * deltaSeconds);
-    this.angularVelocity = Phaser.Math.Clamp(this.angularVelocity, -62, 62);
+    this.angularVelocity += (destabilizingForce + pressureWave + inputForce) * deltaSeconds;
+    this.angularVelocity *= Math.exp(-0.85 * deltaSeconds);
+    this.angularVelocity = Phaser.Math.Clamp(this.angularVelocity, -58, 58);
     this.currentAngle = Phaser.Math.Clamp(
       this.currentAngle + this.angularVelocity * deltaSeconds,
       NEEDLE_MIN,
@@ -197,33 +206,38 @@ export default class MiniGame5Scene extends Phaser.Scene {
   update(time, delta) {
     if (this.isFinished) return;
 
-    if (Phaser.Input.Keyboard.JustDown(this.cursors?.left)) {
-      this._nudgeNeedle(-10);
-    }
-    if (Phaser.Input.Keyboard.JustDown(this.cursors?.right)) {
-      this._nudgeNeedle(10);
+    // Büyük kare gecikmelerini sınırlamak, sekme geri geldiğinde fiziğin ve
+    // sayacın bir anda sona atlayıp sahneyi kilitlenmiş gibi göstermesini önler.
+    const totalDelta = Math.min(Math.max(delta, 0) / 1000, 0.12);
+    this.elapsedTime += totalDelta;
+    this.countdown = Math.max(0, this.countdown - totalDelta);
+    this.inputCooldown = Math.max(0, this.inputCooldown - totalDelta);
+
+    const heldDirection = Number(Boolean(this.cursors?.right?.isDown))
+      - Number(Boolean(this.cursors?.left?.isDown));
+    if (heldDirection !== 0 && this.inputCooldown <= 0) {
+      this._nudgeNeedle(heldDirection * 8);
+      this.inputCooldown = 0.14;
     }
 
-    const now = performance.now();
-    const elapsedSeconds = Math.max(0, (now - this.startedAt) / 1000);
-    const remaining = Math.max(0, TIMER_SECONDS - elapsedSeconds);
-    this.countdown = remaining;
-
-    const displayedSecond = Math.ceil(remaining);
+    const displayedSecond = Math.ceil(this.countdown);
     if (displayedSecond !== this.lastDisplayedSecond) {
       this.lastDisplayedSecond = displayedSecond;
       this.timerText.setText(`Süre: ${displayedSecond}`);
     }
 
-    const totalDelta = Math.min(Math.max(delta, 0) / 1000, 0.12);
     const stepCount = Math.max(1, Math.ceil(totalDelta / (1 / 60)));
     const step = totalDelta / stepCount;
     for (let index = 0; index < stepCount; index += 1) {
-      this._stepPhysics(step, elapsedSeconds);
+      this._stepPhysics(step, this.elapsedTime - totalDelta + step * (index + 1));
     }
     this._syncNeedle();
 
-    if (remaining <= 0) {
+    if (this.currentAngle >= SAFE_MIN && this.currentAngle <= SAFE_MAX) {
+      this.safeElapsed += totalDelta;
+    }
+
+    if (this.countdown <= 0) {
       this._finishGame();
     }
   }
@@ -232,14 +246,19 @@ export default class MiniGame5Scene extends Phaser.Scene {
     if (this.isFinished) return;
     this.isFinished = true;
 
-    const success = this.currentAngle >= SAFE_MIN && this.currentAngle <= SAFE_MAX;
-    this.boiler?.setTexture(success ? 'game5_boiler_true' : 'game5_boiler_wrong');
+    const success = this.currentAngle >= SAFE_MIN
+      && this.currentAngle <= SAFE_MAX
+      && this.safeElapsed >= REQUIRED_SAFE_SECONDS
+      && this.inputCount >= REQUIRED_INPUTS;
     if (success) {
       this._markGameCompleted();
-      this._showResult('Tebrikler!', 'Basınç ibresini güvenli aralıkta tuttun.', 'Ana Menüye Dön');
+      this._showResult('Tebrikler!', 'Basınç ibresini güvenli aralıkta tuttun.', 'Ana Menüye Dön', 'menu');
       pulseSuccess(this, [this.panel, this.panelActionBg.face]);
     } else {
-      this._showResult('Tekrar dene', 'İbreyi 1 bar ile 2 bar arasında tutman gerekiyor.', 'Yeniden Dene');
+      const body = this.inputCount < REQUIRED_INPUTS
+        ? 'Basınç kendiliğinden değişir. Yön tuşlarıyla aktif olarak dengele.'
+        : 'İbreyi güvenli bölgede daha uzun süre tutmalısın.';
+      this._showResult('Tekrar dene', body, 'Yeniden Dene', 'restart');
       shakeSoft(this, this.panel);
     }
   }
@@ -256,13 +275,26 @@ export default class MiniGame5Scene extends Phaser.Scene {
     }
   }
 
-  _showResult(title, body, actionLabel) {
+  _showResult(title, body, actionLabel, action = 'restart') {
+    this.resultAction = action;
     if (this.overlay) this.overlay.setVisible(true);
     if (this.panel) this.panel.setVisible(true);
     if (this.panelActionBg) this.panelActionBg.setVisible(true);
     if (this.panelTitle) this.panelTitle.setText(title);
     if (this.panelBody) this.panelBody.setText(body);
     if (this.panelActionText) this.panelActionText.setText(actionLabel);
+  }
+
+  _goToMainMenu() {
+    if (this.transitioning) return;
+    this.transitioning = true;
+    this.scene.start('MainMenu');
+  }
+
+  _restartGame() {
+    if (this.transitioning) return;
+    this.transitioning = true;
+    this.scene.restart();
   }
 
   _onResize(width, height) {
@@ -285,26 +317,18 @@ export default class MiniGame5Scene extends Phaser.Scene {
     }
 
     const meterWidth = Math.round(compact
-      ? width * 0.468
-      : Math.min(width * 0.34, height * 0.36));
+      ? Math.min(width * 0.78, height * 0.5)
+      : Math.min(width * 0.5, height * 0.64));
     const meterHeight = Math.round(meterWidth * (349 / 667));
     const needleHeight = Math.round(meterHeight * 0.72);
-    const boilerWidth = Math.round(meterWidth * 1.55);
-    const valveWidth = Math.round(meterWidth * 0.34);
+    const valveWidth = Math.round(meterWidth * (compact ? 0.42 : 0.36));
     const centerX = Math.round(width / 2);
-    const centerY = Math.round(height * (compact ? 0.44 : 0.52));
-
-    if (this.boiler) {
-      const source = this.boiler.texture.getSourceImage();
-      const scale = boilerWidth / Math.max(1, source.width);
-      this.boiler.setPosition(centerX, centerY + Math.round(meterHeight * 0.08));
-      this.boiler.setScale(scale);
-    }
+    const centerY = Math.round(height * (compact ? 0.39 : 0.48));
 
     if (this.valve) {
       const source = this.valve.texture.getSourceImage();
       const scale = valveWidth / Math.max(1, source.width);
-      this.valve.setPosition(centerX, centerY + Math.round(meterHeight * 0.88));
+      this.valve.setPosition(centerX, centerY + Math.round(meterHeight * 0.86));
       this.valve.setScale(scale);
     }
 
@@ -335,14 +359,14 @@ export default class MiniGame5Scene extends Phaser.Scene {
     }
 
     if (this.leftButton) {
-      const x = centerX - Math.round(meterWidth * 0.7);
+      const x = compact ? 48 : centerX - Math.round(meterWidth * 0.7);
       this.leftButton.bg.setDisplaySize(compact ? 62 : 88, compact ? 62 : 88);
       this.leftButton.bg.setPosition(x, centerY);
       this.leftButton.text.setPosition(x, centerY).setFontSize(compact ? 31 : 38);
     }
 
     if (this.rightButton) {
-      const x = centerX + Math.round(meterWidth * 0.7);
+      const x = compact ? width - 48 : centerX + Math.round(meterWidth * 0.7);
       this.rightButton.bg.setDisplaySize(compact ? 62 : 88, compact ? 62 : 88);
       this.rightButton.bg.setPosition(x, centerY);
       this.rightButton.text.setPosition(x, centerY).setFontSize(compact ? 31 : 38);

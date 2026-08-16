@@ -58,6 +58,15 @@ const config = {
   backgroundColor: '#f7f4ea',
   parent: 'game-container',
 
+  // Bazı mobil tarayıcılarda requestAnimationFrame, adres çubuğu veya uygulama
+  // odağı değişiminden sonra geri başlamayabiliyor. Sabit zamanlayıcı oyun
+  // döngüsünün ve dokunmatik kontrollerin görünür ekranda takılmasını önler.
+  fps: {
+    target: 60,
+    forceSetTimeOut: true,
+    smoothStep: true
+  },
+
   scale: {
     parent: 'game-container',
     // Parent ölçüsünü aşağıdaki ResizeObserver ile doğrudan uyguluyoruz.
@@ -187,13 +196,27 @@ const queueScaleRefresh = () => {
   });
 };
 
+// Bazı mobil tarayıcılar adres çubuğu, uygulama değişimi veya ekran kilidi
+// sonrasında pencere odak olayını geciktirebiliyor. İlk dokunuşta oyun döngüsünü
+// ve etkileşimi tekrar odaklayarak düğmelerin donmuş gibi kalmasını önle.
+const restoreGameInteraction = () => {
+  if (!game.loop.inFocus) game.loop.focus();
+  if (game.isPaused) game.resume();
+  queueScaleRefresh();
+};
+
 const resizeObserver = new ResizeObserver(queueScaleRefresh);
 resizeObserver.observe(gameContainer);
 
 window.addEventListener('resize', queueScaleRefresh, { passive: true });
 window.addEventListener('orientationchange', queueScaleRefresh, { passive: true });
+window.addEventListener('focus', restoreGameInteraction, { passive: true });
 window.visualViewport?.addEventListener('resize', queueScaleRefresh, { passive: true });
 document.addEventListener('fullscreenchange', queueScaleRefresh);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) restoreGameInteraction();
+});
+gameContainer.addEventListener('pointerdown', restoreGameInteraction, { capture: true, passive: true });
 
 queueScaleRefresh();
 window.setTimeout(queueScaleRefresh, 120);
