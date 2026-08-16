@@ -20,6 +20,9 @@ export default class MainMenuScene extends Phaser.Scene {
     this.celebration = null;
     this._resizeHandler = null;
     this.transitioning = false;
+    this._layoutWidth = 0;
+    this._layoutHeight = 0;
+    this._viewportSyncFrames = 0;
   }
 
   preload() {
@@ -30,6 +33,19 @@ export default class MainMenuScene extends Phaser.Scene {
 
   create() {
     this.transitioning = false;
+    this._viewportSyncFrames = 30;
+    this._layoutWidth = 0;
+    this._layoutHeight = 0;
+    // Phaser aynı Scene örneğini yeniden kullanır. İlk kez bütün oyunlar
+    // tamamlandığında oluşturulan kutlama nesneleri shutdown sırasında yok
+    // edilir; referansları sıfırlanmazsa sonraki menü girişinde responsive
+    // yerleşim bu eski nesneleri güncellemeye çalışıp create akışını yarıda
+    // keser. Sonuç, küçük kartlarla eski ekran ölçüsünde kalan bir menüydü.
+    this.cards = [];
+    this.header = null;
+    this.backdrop = null;
+    this.celebration = null;
+    window.__refreshGameViewport?.();
     this.backdrop = addBackdrop(this, { color: UI_COLORS.cream, accent: UI_COLORS.teal, secondary: UI_COLORS.amber });
     this.header = createHeader(
       this,
@@ -140,6 +156,7 @@ export default class MainMenuScene extends Phaser.Scene {
       hit.on('pointerup', () => {
         if (this.transitioning) return;
         this.transitioning = true;
+        window.__refreshGameViewport?.();
         hit.disableInteractive();
         state.down = false;
         surface.setAlpha(1);
@@ -148,7 +165,10 @@ export default class MainMenuScene extends Phaser.Scene {
           scaleX: 1,
           scaleY: 1,
           duration: 70,
-          onComplete: () => this.scene.start(game.scene)
+          onComplete: () => {
+            window.__refreshGameViewport?.();
+            this.scene.start(game.scene);
+          }
         });
       });
     }
@@ -211,6 +231,9 @@ export default class MainMenuScene extends Phaser.Scene {
   }
 
   _positionMenu(width, height) {
+    const viewport = this._getViewportSize();
+    width = viewport.width;
+    height = viewport.height;
     this._layoutWidth = width;
     this._layoutHeight = height;
     this.backdrop?.resize(width, height);
@@ -265,13 +288,27 @@ export default class MainMenuScene extends Phaser.Scene {
   update() {
     // Resize olayı tarayıcı tarafından geciktirilse bile menünün eski ekran
     // koordinatlarında kalmasına izin verme.
-    if (this._layoutWidth !== this.scale.width || this._layoutHeight !== this.scale.height) {
-      this._positionMenu(this.scale.width, this.scale.height);
+    if (this._viewportSyncFrames <= 0) return;
+    this._viewportSyncFrames -= 1;
+    const viewport = this._getViewportSize();
+    if (this._layoutWidth !== viewport.width || this._layoutHeight !== viewport.height) {
+      this._positionMenu(viewport.width, viewport.height);
     }
   }
 
+  _getViewportSize() {
+    const canvas = this.game?.canvas;
+    const parent = canvas?.parentElement;
+    const bounds = parent?.getBoundingClientRect?.() || canvas?.getBoundingClientRect?.();
+
+    return {
+      width: Math.max(1, Math.round(bounds?.width || window.innerWidth || this.scale.width)),
+      height: Math.max(1, Math.round(bounds?.height || window.innerHeight || this.scale.height))
+    };
+  }
+
   _showAllGamesCelebration() {
-    const { width, height } = this.scale;
+    const { width, height } = this._getViewportSize();
     const overlay = this.add.rectangle(0, 0, width, height, UI_COLORS.navy, 0.72)
       .setOrigin(0)
       .setDepth(500)
@@ -397,9 +434,13 @@ export default class MainMenuScene extends Phaser.Scene {
   }
 
   _onShutdown() {
+    this.tweens?.killAll();
     if (this._resizeHandler) {
       this.scale.off('resize', this._resizeHandler);
       this._resizeHandler = null;
     }
+    this.celebration = null;
+    this._viewportSyncFrames = 0;
+    window.__refreshGameViewport?.();
   }
 }
