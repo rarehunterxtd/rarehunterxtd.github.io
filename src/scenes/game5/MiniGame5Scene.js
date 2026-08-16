@@ -69,9 +69,7 @@ export default class MiniGame5Scene extends Phaser.Scene {
 
     this.timerText = this.add.text(width / 2, 24, `Süre: ${TIMER_SECONDS}`, {
       fontSize: '24px',
-      color: '#17324d',
-      backgroundColor: '#ffffff',
-      padding: { x: 14, y: 7 }
+      color: '#17324d'
     }).setOrigin(0.5, 0).setDepth(60);
     this.feedbackText = this.add.text(width / 2, 58, 'İbreyi ortada tut.', {
       fontSize: '18px',
@@ -108,7 +106,7 @@ export default class MiniGame5Scene extends Phaser.Scene {
 
     this.panel = this.add.container(width / 2, height / 2).setDepth(1001).setVisible(false);
     const panelBg = createPanel(this, 0, 0, Math.min(440, width - 40), 250, {
-      fill: UI_COLORS.paper, stroke: 0xc9c0e8, radius: 24, shadowAlpha: 0.25
+      fill: UI_COLORS.paper, stroke: 0xc9c0e8, radius: 24, shadow: false
     });
     this.panelTitle = this.add.text(0, -58, '', { fontSize: '30px', color: '#17324d', fontStyle: 'bold', align: 'center' }).setOrigin(0.5);
     this.panelBody = this.add.text(0, -8, '', {
