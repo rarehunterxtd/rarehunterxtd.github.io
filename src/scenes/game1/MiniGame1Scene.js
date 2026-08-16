@@ -1,13 +1,15 @@
 import Phaser from 'phaser';
 import { addBackdrop, createButton, createPanel, pulseSuccess, shakeSoft, UI_COLORS } from '../../ui/gameUi.js';
 
+const assetUrl = (file) => `${import.meta.env.BASE_URL}assets/game1/${file}`;
+
 // Senaryolar dizisi: her bir senaryo video içerip içermediğini, video/resim yollarını ve seçenek listesini içerir
 const DEFAULT_SCENARIOS = [
   {
     id: 'scenario1',
     hasVideo: true,
-    videoPath: '/assets/game1/video1.mp4',
-    imagePath: '/assets/game1/sonuc1.png',
+    videoPath: assetUrl('video1.mp4'),
+    imagePath: assetUrl('sonuc1.png'),
     text: 'Mutfaktaki ocaktan hafif bir duman geliyor.',
     options: [
       { id: 'opt1', label: 'Ocağı açık bırakıp balkona çıkarım', isCorrect: false, feedback: 'Yanlış! Tekrar dene.' },
@@ -18,7 +20,7 @@ const DEFAULT_SCENARIOS = [
   {
     id: 'scenario2',
     hasVideo: false,
-    imagePath: '/assets/game1/sonuc2.png',
+    imagePath: assetUrl('sonuc2.png'),
     text: 'Evde yoğun bir gaz kokusu var.',
     options: [
       { id: 'opt1', label: 'Elektrik düğmesini açarım', isCorrect: false, feedback: 'Yanlış! Tekrar dene.' },
@@ -29,8 +31,8 @@ const DEFAULT_SCENARIOS = [
   {
     id: 'scenario3',
     hasVideo: true,
-    videoPath: '/assets/game1/video3.mp4',
-    imagePath: '/assets/game1/sonuc3.png',
+    videoPath: assetUrl('video3.mp4'),
+    imagePath: assetUrl('sonuc3.png'),
     text: 'Kış ayları geldi, havalar çok soğudu ve camdaki havalandırma menfezinden içeriye sürekli soğuk hava giriyor.',
     options: [
       { id: 'opt1', label: 'İçeri soğuk girmesin diye menfezi bantla tamamen kapatırım', isCorrect: false, feedback: 'Yanlış! Tekrar dene.' },
@@ -41,7 +43,7 @@ const DEFAULT_SCENARIOS = [
   {
     id: 'scenario4',
     hasVideo: false,
-    imagePath: '/assets/game1/sonuc4.png',
+    imagePath: assetUrl('sonuc4.png'),
     text: 'Kombiden tuhaf tıkırtılar gelmeye başladı, cihaz hata kodu veriyor ve evin içi ısınmıyor.',
     options: [
       { id: 'opt1', label: 'Cihaza müdahale etmeden hemen yetkili servisi çağırırım', isCorrect: true, feedback: 'Doğru! Tebrikler.' },
@@ -52,7 +54,7 @@ const DEFAULT_SCENARIOS = [
   {
     id: 'scenario5',
     hasVideo: false,
-    imagePath: '/assets/game1/sonuc5.png',
+    imagePath: assetUrl('sonuc5.png'),
     text: 'Evinizin önündeki doğal gaz kutusunun veya hattının çok yakınında, dikkatsiz bir kazı çalışması yapıldığını gördün.',
     options: [
       { id: 'opt1', label: '"Beni ilgilendirmez" diyerek oradan uzaklaşırım', isCorrect: false, feedback: 'Yanlış! Tekrar dene.' },

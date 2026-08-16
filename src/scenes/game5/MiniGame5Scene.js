@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { addBackdrop, createButton, createPanel, pulseSuccess, shakeSoft, UI_COLORS } from '../../ui/gameUi.js';
 
+const assetUrl = (file) => `${import.meta.env.BASE_URL}assets/game5/${file}`;
+
 const SAFE_MIN = -30;
 const SAFE_MAX = 30;
 const TIMER_SECONDS = 30;
@@ -34,8 +36,8 @@ export default class MiniGame5Scene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.image('game5_pressure_meter', '/assets/game5/pressure_meter.png');
-    this.load.image('game5_needle', '/assets/game5/ibre.png');
+    this.load.image('game5_pressure_meter', assetUrl('pressure_meter.png'));
+    this.load.image('game5_needle', assetUrl('ibre.png'));
   }
 
   create() {
