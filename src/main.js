@@ -35,8 +35,23 @@ if (!Phaser.GameObjects.GameObjectFactory.prototype.__gazmerTextPatched) {
   Phaser.GameObjects.GameObjectFactory.prototype.__gazmerTextPatched = true;
 }
 
+const gameContainer = document.getElementById('game-container');
+
+const readViewportSize = () => {
+  const bounds = gameContainer.getBoundingClientRect();
+
+  return {
+    width: Math.max(1, Math.round(bounds.width || window.innerWidth)),
+    height: Math.max(1, Math.round(bounds.height || window.innerHeight))
+  };
+};
+
+const initialSize = readViewportSize();
+
 const config = {
   type: Phaser.AUTO,
+  width: initialSize.width,
+  height: initialSize.height,
   pixelArt: false,
   antialias: true,
   backgroundColor: '#f7f4ea',
@@ -44,9 +59,12 @@ const config = {
 
   scale: {
     parent: 'game-container',
-    mode: Phaser.Scale.RESIZE,
-    width: '100%',
-    height: '100%',
+    // Parent ölçüsünü aşağıdaki ResizeObserver ile doğrudan uyguluyoruz.
+    // Böylece mobil tarayıcı çubuğu, tam ekran ve yüksek DPI ekranlarda
+    // ScaleManager'ın eski bir parent ölçüsünde kalması engellenir.
+    mode: Phaser.Scale.NONE,
+    width: initialSize.width,
+    height: initialSize.height,
     autoCenter: Phaser.Scale.NO_CENTER,
     autoRound: true,
     expandParent: false,
@@ -65,7 +83,6 @@ const config = {
   ]
 };
 
-const gameContainer = document.getElementById('game-container');
 const game = new Phaser.Game(config);
 window.game = game;
 
@@ -87,13 +104,26 @@ const refreshTextResolution = () => {
 };
 
 // Pencere, yön, tarayıcı tam ekranı ve parent ölçüsü değişikliklerini tek
-// animasyon karesinde birleştirir. refresh(), RESIZE modunun güncel parent
-// ölçülerini sahnelere Phaser.Scale.Events.RESIZE olarak iletmesini sağlar.
+// animasyon karesinde birleştirir. Ölçüyü DOM'dan okuyup Phaser canvas'ına
+// doğrudan uygulamak, bazı mobil/4K tarayıcılarda görülen yarım ekran ve
+// ekran dışında kalan menü sorunlarını ortadan kaldırır.
 const queueScaleRefresh = () => {
   window.cancelAnimationFrame(refreshFrame);
   refreshFrame = window.requestAnimationFrame(() => {
     if (!game.scale?.canvas) return;
-    game.scale.refresh();
+
+    const { width, height } = readViewportSize();
+    const sizeChanged = game.scale.width !== width
+      || game.scale.height !== height
+      || game.canvas.width !== width
+      || game.canvas.height !== height;
+
+    if (sizeChanged) {
+      game.scale.resize(width, height);
+    } else {
+      game.scale.updateBounds();
+    }
+
     refreshTextResolution();
   });
 };
@@ -107,3 +137,5 @@ window.visualViewport?.addEventListener('resize', queueScaleRefresh, { passive: 
 document.addEventListener('fullscreenchange', queueScaleRefresh);
 
 queueScaleRefresh();
+window.setTimeout(queueScaleRefresh, 120);
+window.setTimeout(queueScaleRefresh, 600);

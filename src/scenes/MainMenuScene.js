@@ -206,6 +206,8 @@ export default class MainMenuScene extends Phaser.Scene {
   }
 
   _positionMenu(width, height) {
+    this._layoutWidth = width;
+    this._layoutHeight = height;
     this.backdrop?.resize(width, height);
     const phoneLayout = width < 560;
     const compactHeight = height < 650;
@@ -253,6 +255,14 @@ export default class MainMenuScene extends Phaser.Scene {
       this._positionCardText(card);
     });
     this._positionCelebration(width, height);
+  }
+
+  update() {
+    // Resize olayı tarayıcı tarafından geciktirilse bile menünün eski ekran
+    // koordinatlarında kalmasına izin verme.
+    if (this._layoutWidth !== this.scale.width || this._layoutHeight !== this.scale.height) {
+      this._positionMenu(this.scale.width, this.scale.height);
+    }
   }
 
   _showAllGamesCelebration() {
