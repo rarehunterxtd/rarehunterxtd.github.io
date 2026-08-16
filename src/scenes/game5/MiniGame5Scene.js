@@ -1,8 +1,11 @@
 import Phaser from 'phaser';
 import { addBackdrop, createButton, createPanel, pulseSuccess, shakeSoft, UI_COLORS } from '../../ui/gameUi.js';
 
-const SAFE_MIN = -30;
-const SAFE_MAX = 30;
+const assetUrl = (file) => `${import.meta.env.BASE_URL}assets/game5/${file}`;
+
+const SAFE_MIN = -31;
+const SAFE_MAX = 32;
+const showSafeAngles = false;
 const TIMER_SECONDS = 30;
 const NEEDLE_MIN = -90;
 const NEEDLE_MAX = 90;
@@ -10,8 +13,12 @@ const NEEDLE_MAX = 90;
 export default class MiniGame5Scene extends Phaser.Scene {
   constructor() {
     super('MiniGame5');
+    this.boiler = null;
+    this.valve = null;
     this.pressureMeter = null;
     this.needle = null;
+    this.safeMinNeedle = null;
+    this.safeMaxNeedle = null;
     this.timerText = null;
     this.feedbackText = null;
     this.leftButton = null;
@@ -34,8 +41,12 @@ export default class MiniGame5Scene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.image('game5_pressure_meter', '/assets/game5/pressure_meter.png');
-    this.load.image('game5_needle', '/assets/game5/ibre.png');
+    this.load.image('game5_boiler_off', assetUrl('kombi_off.png'));
+    this.load.image('game5_boiler_true', assetUrl('kombi_true.png'));
+    this.load.image('game5_boiler_wrong', assetUrl('kombi_wrong.png'));
+    this.load.image('game5_valve', assetUrl('vana.png'));
+    this.load.image('game5_pressure_meter', assetUrl('pressure_meter.png'));
+    this.load.image('game5_needle', assetUrl('ibre.png'));
   }
 
   create() {
@@ -68,8 +79,16 @@ export default class MiniGame5Scene extends Phaser.Scene {
       fontStyle: 'bold'
     }).setOrigin(0.5, 0).setDepth(60);
 
+    this.boiler = this.add.image(width / 2, height / 2, 'game5_boiler_off').setOrigin(0.5).setDepth(4);
+    this.valve = this.add.image(width / 2, height / 2 + 140, 'game5_valve').setOrigin(0.5).setDepth(6);
     this.pressureMeter = this.add.image(width / 2, height / 2, 'game5_pressure_meter').setOrigin(0.5).setDepth(10);
     this.needle = this.add.image(width / 2, height / 2, 'game5_needle').setOrigin(0.5, 1).setDepth(20);
+    if (showSafeAngles) {
+      this.safeMinNeedle = this.add.image(width / 2, height / 2, 'game5_needle').setOrigin(0.5, 1).setDepth(19).setAlpha(0.45);
+      this.safeMaxNeedle = this.add.image(width / 2, height / 2, 'game5_needle').setOrigin(0.5, 1).setDepth(19).setAlpha(0.45);
+      this.safeMinNeedle.setAngle(SAFE_MIN);
+      this.safeMaxNeedle.setAngle(SAFE_MAX);
+    }
     this.currentAngle = 0;
     this.angularVelocity = 0;
     this.needle.setAngle(this.currentAngle);
@@ -133,14 +152,29 @@ export default class MiniGame5Scene extends Phaser.Scene {
 
   _nudgeNeedle(delta) {
     if (this.isFinished) return;
+    this._animateValve(Math.sign(delta));
     this.angularVelocity += delta * 2.15;
     this.manualForce += delta * 0.7;
   }
 
-  _stepPhysics(deltaSeconds, elapsedSeconds, keyboardForce) {
+  _animateValve(direction) {
+    if (!this.valve || this.isFinished || direction === 0) return;
+    this.tweens.killTweensOf(this.valve);
+    this.valve.setAngle(0);
+    this.tweens.add({
+      targets: this.valve,
+      angle: direction < 0 ? -30 : 30,
+      duration: 90,
+      ease: 'Sine.Out',
+      yoyo: true,
+      hold: 20
+    });
+  }
+
+  _stepPhysics(deltaSeconds, elapsedSeconds) {
     const destabilizingForce = this.currentAngle * 0.075;
     const naturalWobble = Math.sin(elapsedSeconds * 1.35) * 5.2;
-    const inputForce = keyboardForce * 92 + this.manualForce;
+    const inputForce = this.manualForce;
 
     this.angularVelocity += (destabilizingForce + naturalWobble + inputForce) * deltaSeconds;
     this.angularVelocity *= Math.exp(-0.48 * deltaSeconds);
@@ -165,9 +199,12 @@ export default class MiniGame5Scene extends Phaser.Scene {
   update(time, delta) {
     if (this.isFinished) return;
 
-    let keyboardForce = 0;
-    if (this.cursors?.left?.isDown) keyboardForce -= 1;
-    if (this.cursors?.right?.isDown) keyboardForce += 1;
+    if (Phaser.Input.Keyboard.JustDown(this.cursors?.left)) {
+      this._nudgeNeedle(-10);
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.cursors?.right)) {
+      this._nudgeNeedle(10);
+    }
 
     const now = performance.now();
     const elapsedSeconds = Math.max(0, (now - this.startedAt) / 1000);
@@ -184,7 +221,7 @@ export default class MiniGame5Scene extends Phaser.Scene {
     const stepCount = Math.max(1, Math.ceil(totalDelta / (1 / 60)));
     const step = totalDelta / stepCount;
     for (let index = 0; index < stepCount; index += 1) {
-      this._stepPhysics(step, elapsedSeconds, keyboardForce);
+      this._stepPhysics(step, elapsedSeconds);
     }
     this._syncNeedle();
 
@@ -198,12 +235,13 @@ export default class MiniGame5Scene extends Phaser.Scene {
     this.isFinished = true;
 
     const success = this.currentAngle >= SAFE_MIN && this.currentAngle <= SAFE_MAX;
+    this.boiler?.setTexture(success ? 'game5_boiler_true' : 'game5_boiler_wrong');
     if (success) {
       this._markGameCompleted();
       this._showResult('Tebrikler!', 'Basınç ibresini güvenli aralıkta tuttun.', 'Ana Menüye Dön');
       pulseSuccess(this, [this.panel, this.panelActionBg.face]);
     } else {
-      this._showResult('Tekrar dene', 'İbreyi -30 ile +30 arasında tutman gerekiyor.', 'Yeniden Dene');
+      this._showResult('Tekrar dene', 'İbreyi 1 bar ile 2 bar arasında tutman gerekiyor.', 'Yeniden Dene');
       shakeSoft(this, this.panel);
     }
   }
@@ -248,11 +286,27 @@ export default class MiniGame5Scene extends Phaser.Scene {
       this.feedbackText.setFontSize(compact ? 16 : 18);
     }
 
-    const meterWidth = Math.round(Math.min(width * (compact ? 0.88 : 0.56), height * 1.05));
+    const meterWidth = Math.round(Math.min(width * (compact ? 0.88 : 0.56), height * 1.05) * 0.6);
     const meterHeight = Math.round(meterWidth * (349 / 667));
     const needleHeight = Math.round(meterHeight * 0.72);
+    const boilerWidth = Math.round(meterWidth * 1.55);
+    const valveWidth = Math.round(meterWidth * 0.34);
     const centerX = Math.round(width / 2);
     const centerY = Math.round(height * (compact ? 0.47 : 0.52));
+
+    if (this.boiler) {
+      const source = this.boiler.texture.getSourceImage();
+      const scale = boilerWidth / Math.max(1, source.width);
+      this.boiler.setPosition(centerX, centerY + Math.round(meterHeight * 0.08));
+      this.boiler.setScale(scale);
+    }
+
+    if (this.valve) {
+      const source = this.valve.texture.getSourceImage();
+      const scale = valveWidth / Math.max(1, source.width);
+      this.valve.setPosition(centerX, centerY + Math.round(meterHeight * 0.88));
+      this.valve.setScale(scale);
+    }
 
     if (this.pressureMeter) {
       this.pressureMeter.setPosition(centerX, centerY);
@@ -266,15 +320,29 @@ export default class MiniGame5Scene extends Phaser.Scene {
       this.needle.setAngle(this.currentAngle);
     }
 
+    if (this.safeMinNeedle) {
+      this.safeMinNeedle.setPosition(centerX, centerY + Math.round(meterHeight * 0.32));
+      this.safeMinNeedle.setDisplaySize(Math.max(12, Math.round(needleHeight * (37 / 244))), needleHeight);
+      this.safeMinNeedle.setOrigin(0.5, 1);
+      this.safeMinNeedle.setAngle(SAFE_MIN);
+    }
+
+    if (this.safeMaxNeedle) {
+      this.safeMaxNeedle.setPosition(centerX, centerY + Math.round(meterHeight * 0.32));
+      this.safeMaxNeedle.setDisplaySize(Math.max(12, Math.round(needleHeight * (37 / 244))), needleHeight);
+      this.safeMaxNeedle.setOrigin(0.5, 1);
+      this.safeMaxNeedle.setAngle(SAFE_MAX);
+    }
+
     if (this.leftButton) {
-      const x = centerX - Math.round(meterWidth * 0.42);
+      const x = centerX - Math.round(meterWidth * 0.7);
       this.leftButton.bg.setDisplaySize(compact ? 72 : 88, compact ? 72 : 88);
       this.leftButton.bg.setPosition(x, centerY);
       this.leftButton.text.setPosition(x, centerY);
     }
 
     if (this.rightButton) {
-      const x = centerX + Math.round(meterWidth * 0.42);
+      const x = centerX + Math.round(meterWidth * 0.7);
       this.rightButton.bg.setDisplaySize(compact ? 72 : 88, compact ? 72 : 88);
       this.rightButton.bg.setPosition(x, centerY);
       this.rightButton.text.setPosition(x, centerY);

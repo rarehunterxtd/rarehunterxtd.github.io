@@ -1,34 +1,36 @@
 import Phaser from 'phaser';
 import { createButton, createPanel, pulseSuccess, UI_COLORS } from '../../ui/gameUi.js';
 
+const assetUrl = (file) => `${import.meta.env.BASE_URL}assets/game2/${file}`;
+
 // Item definitions: keys, file paths and relative positions/sizes (percent of game size)
 // pos: { x: 0..1, y: 0..1 } relative to width/height
 // size: width as percent of game width (0..1)
 const ITEM_DEFS = {
   item1: {
     keys: ['game2_menfez_off', 'game2_menfez_on'],
-    paths: ['/assets/game2/menfez_off.png', '/assets/game2/menfez_on.png'],
+    paths: [assetUrl('menfez_off.png'), assetUrl('menfez_on.png')],
     pos: { x: 0.65, y: 0.20 },
     size: 0.10,
     desc: 'Menfez kapatılırsa temiz hava girişi engellenir ve gaz birikmesi yaşanabilir.'
   },
   item2: {
     keys: ['game2_ocak_off', 'game2_ocak_on'],
-    paths: ['/assets/game2/ocak_off.png', '/assets/game2/ocak_on.png'],
+    paths: [assetUrl('ocak_off.png'), assetUrl('ocak_on.png')],
     pos: { x: 0.58, y: 0.75 },
     size: 0.28,
     desc: 'Açık ocak unutulursa gaz kaçağı ve patlama riski olabilir.'
   },
   item3: {
     keys: ['game2_hortum_off', 'game2_hortum_on'],
-    paths: ['/assets/game2/hortum_off.png', '/assets/game2/hortum_on.png'],
+    paths: [assetUrl('hortum_off.png'), assetUrl('hortum_on.png')],
     pos: { x: 0.125, y: 0.63 },
     size: 0.25,
     desc: 'Gevşek hortum kaçak yapabilir; bağlantılar sağlam olmalıdır.'
   },
   item4: {
     keys: ['game2_kombi_off', 'game2_kombi_on'],
-    paths: ['/assets/game2/kombi_off.png', '/assets/game2/kombi_on.png'],
+    paths: [assetUrl('kombi_off.png'), assetUrl('kombi_on.png')],
     pos: { x: 0.21, y: 0.30 },
     size: 0.20,
     desc: 'Kombi etrafının kapatılması havalandırmayı engeller; boşluk bırakılmalı.'
@@ -51,13 +53,13 @@ export default class MiniGame2Scene extends Phaser.Scene {
 
   preload() {
     // Background (user will place actual image at this path)
-    // Load from `public/assets` (served at `/assets/...`) so build/preview can find them
-    this.load.image('game2_bg', '/assets/game2/background.png');
+    // Load from public/assets with BASE_URL so subpath deployments are supported
+    this.load.image('game2_bg', assetUrl('background.png'));
 
     // Load item image pairs from ITEM_DEFS
     Object.keys(ITEM_DEFS).forEach((id) => {
       const def = ITEM_DEFS[id];
-      // keys[0] = unclicked, keys[1] = clicked (public folder: /assets/...)
+      // keys[0] = unclicked, keys[1] = clicked
       this.load.image(def.keys[0], def.paths[0]);
       this.load.image(def.keys[1], def.paths[1]);
     });
@@ -184,9 +186,7 @@ export default class MiniGame2Scene extends Phaser.Scene {
     if (Object.values(this.itemState).every(Boolean)) {
       this._markGameCompleted();
       // Show completion UI after a short delay so completion state is perceived first
-      this.time.delayedCall(5000, () => {
-        this._showCompletionUI();
-      });
+      this._showCompletionUI();
     }
   }
 

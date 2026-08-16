@@ -6,8 +6,7 @@ const GAME_CARDS = [
   { key: 'game2', scene: 'MiniGame2', number: '02', title: 'Tehlikeyi Bul', subtitle: 'Riskleri fark et', color: 0x1f9d8b, icon: 'search' },
   { key: 'game3', scene: 'MiniGame3', number: '03', title: 'Gaz Kaçağı', subtitle: 'Adımları sırala', color: 0xe97862, icon: 'steps' },
   { key: 'game4', scene: 'MiniGame4', number: '04', title: 'GAZO ve Menfezler', subtitle: 'Hava yolunu aç', color: 0xf2b84b, icon: 'vent' },
-  { key: 'game5', scene: 'MiniGame5', number: '05', title: 'Basınç Ustası', subtitle: 'İbreyi dengede tut', color: 0x7768b5, icon: 'gauge' },
-  { key: 'game6', scene: 'MiniGame6', number: '06', title: 'Hangisi Yetkili?', subtitle: 'Bilgini test et', color: 0x49a66f, icon: 'badge' }
+  { key: 'game5', scene: 'MiniGame5', number: '05', title: 'Basınç Ustası', subtitle: 'İbreyi dengede tut', color: 0x7768b5, icon: 'gauge' }
 ];
 
 export default class MainMenuScene extends Phaser.Scene {
@@ -20,6 +19,12 @@ export default class MainMenuScene extends Phaser.Scene {
     this.allGamesCelebratedKey = 'allGamesCelebrated';
     this.celebration = null;
     this._resizeHandler = null;
+  }
+
+  preload() {
+    if (!this.textures.exists('game3_main_icon')) {
+      this.load.image('game3_main_icon', `${import.meta.env.BASE_URL}assets/game3/icon.png`);
+    }
   }
 
   create() {
@@ -51,6 +56,7 @@ export default class MainMenuScene extends Phaser.Scene {
     const shadow = this.add.graphics().setDepth(5);
     const surface = this.add.graphics().setDepth(6);
     const icon = this.add.graphics().setDepth(8);
+    const pngIcon = this.add.image(0, 0, 'game3_main_icon').setOrigin(0.5).setDepth(9).setVisible(game.key === 'game3');
     const number = this.add.text(0, 0, `${completed ? '✓  ' : ''}OYUN ${game.number}`, {
       fontSize: '12px',
       color: '#49657d',
@@ -87,6 +93,16 @@ export default class MainMenuScene extends Phaser.Scene {
       surface.strokeRoundedRect(left, top - (state.over ? 3 : 0), width, height, radius);
       surface.fillStyle(completed ? 0x8fbda2 : game.color, completed ? 0.22 : 0.13);
       surface.fillRoundedRect(left + 14, top + 14 - (state.over ? 3 : 0), 66, height - 28, Math.min(17, radius));
+
+      if (game.key === 'game3') {
+        icon.clear();
+        pngIcon.setVisible(true);
+        const iconSize = Math.min(50, Math.max(32, height * 0.38));
+        pngIcon.setPosition(left + 47, y - (state.over ? 3 : 0)).setDisplaySize(iconSize, iconSize);
+        return;
+      }
+
+      pngIcon.setVisible(false);
       this._drawCardIcon(icon, game.icon, left + 47, y - (state.over ? 3 : 0), completed ? UI_COLORS.greenDark : game.color, height);
     };
 
@@ -121,7 +137,7 @@ export default class MainMenuScene extends Phaser.Scene {
       });
     }
 
-    const card = { game, index, completed, shadow, surface, icon, number, title, subtitle, action, hit, state, redraw };
+    const card = { game, index, completed, shadow, surface, icon, pngIcon, number, title, subtitle, action, hit, state, redraw };
     return card;
   }
 
@@ -195,11 +211,17 @@ export default class MainMenuScene extends Phaser.Scene {
     const gridHeight = cardHeight * rows + gapY * (rows - 1);
     const startX = width / 2 - gridWidth / 2 + cardWidth / 2;
     const startY = gridTop + Math.max(0, (availableHeight - gridHeight) / 2) + cardHeight / 2;
+    const remainder = this.cards.length % cols;
+    const lastRowCount = remainder === 0 ? cols : remainder;
 
     this.cards.forEach((card, index) => {
       const col = index % cols;
       const row = Math.floor(index / cols);
-      card.state.x = startX + col * (cardWidth + gapX);
+      const isLastRow = row === rows - 1;
+      const rowCount = isLastRow ? lastRowCount : cols;
+      const rowWidth = cardWidth * rowCount + gapX * (rowCount - 1);
+      const rowStartX = width / 2 - rowWidth / 2 + cardWidth / 2;
+      card.state.x = rowStartX + col * (cardWidth + gapX);
       card.state.y = startY + row * (cardHeight + gapY);
       card.state.width = cardWidth;
       card.state.height = cardHeight;
@@ -239,7 +261,7 @@ export default class MainMenuScene extends Phaser.Scene {
     const body = this.add.text(
       0,
       34,
-      'Altı doğal gaz güvenliği oyununu da tamamladın.\nArtık istediğin oyunu yeniden oynayabilirsin.',
+      'Tüm doğal gaz güvenliği oyunlarını tamamladın.\nArtık istediğin oyunu yeniden oynayabilirsin.',
       {
         fontSize: '18px',
         color: '#49657d',

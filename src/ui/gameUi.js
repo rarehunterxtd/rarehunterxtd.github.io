@@ -368,7 +368,7 @@ export function createButton(scene, {
 }
 
 export function createHeader(scene, title, subtitle = '') {
-  const eyebrow = scene.add.text(0, 0, 'GAZMER • GÜVENLİ YAŞAM', {
+  const eyebrow = scene.add.text(0, 0, 'BİLİNÇLİ KULLANIM • GÜVENLİ YAŞAM', {
     fontSize: '13px',
     color: toCss(UI_COLORS.tealDark),
     fontStyle: 'bold',

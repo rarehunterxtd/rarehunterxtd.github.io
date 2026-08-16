@@ -7,7 +7,6 @@ import MiniGame1Scene from './scenes/game1/MiniGame1Scene.js';
 import MiniGame3Scene from './scenes/game3/MiniGame3Scene.js';
 import MiniGame4Scene from './scenes/game4/MiniGame4Scene.js';
 import MiniGame5Scene from './scenes/game5/MiniGame5Scene.js';
-import MiniGame6Scene from './scenes/game6/MiniGame6Scene.js';
 
 const DEFAULT_TEXT_STYLE = {
   fontFamily: 'Trebuchet MS, sans-serif'
@@ -15,25 +14,49 @@ const DEFAULT_TEXT_STYLE = {
 
 if (!Phaser.GameObjects.GameObjectFactory.prototype.__gazmerTextPatched) {
   const originalText = Phaser.GameObjects.GameObjectFactory.prototype.text;
-  Phaser.GameObjects.GameObjectFactory.prototype.text = function (x, y, text, style = {}) {
+
+  Phaser.GameObjects.GameObjectFactory.prototype.text = function (
+    x,
+    y,
+    text,
+    style = {}
+  ) {
     return originalText.call(this, x, y, text, {
       ...DEFAULT_TEXT_STYLE,
       ...style
     });
   };
+
   Phaser.GameObjects.GameObjectFactory.prototype.__gazmerTextPatched = true;
 }
 
+const getDpr = () => Math.min(window.devicePixelRatio || 1, 2);
+
+const getPhysicalSize = () => ({
+  width: Math.max(1, Math.round(window.innerWidth * getDpr())),
+  height: Math.max(1, Math.round(window.innerHeight * getDpr()))
+});
+
+const initialSize = getPhysicalSize();
+
 const config = {
   type: Phaser.AUTO,
-  width: 800,
-  height: 600,
+
+  // Phaser'ın internal resolution'ı DPR ile yüksek tutuluyor.
+  width: initialSize.width,
+  height: initialSize.height,
+
+  pixelArt: false,
+  antialias: true,
+
   backgroundColor: '#222',
   parent: 'game-container',
+
   scale: {
-    mode: Phaser.Scale.RESIZE,
+    mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
   },
+
   scene: [
     MainMenuScene,
     Game2MainMenuScene,
@@ -42,11 +65,20 @@ const config = {
     MiniGame1Scene,
     MiniGame3Scene,
     MiniGame4Scene,
-    MiniGame5Scene,
-    MiniGame6Scene
+    MiniGame5Scene
   ]
 };
 
 window.addEventListener('load', () => {
-  new Phaser.Game(config);
+  window.game = new Phaser.Game(config);
+
+  // Ekran boyutu değiştiğinde Phaser'ın fiziksel game size'ını
+  // viewport × DPR olarak güncelle.
+  window.addEventListener('resize', () => {
+    if (!window.game) return;
+
+    const size = getPhysicalSize();
+
+    window.game.scale.resize(size.width, size.height);
+  });
 });
