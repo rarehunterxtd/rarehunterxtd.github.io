@@ -21,6 +21,12 @@ export default class MainMenuScene extends Phaser.Scene {
     this._resizeHandler = null;
   }
 
+  preload() {
+    if (!this.textures.exists('game3_main_icon')) {
+      this.load.image('game3_main_icon', `${import.meta.env.BASE_URL}assets/game3/icon.png`);
+    }
+  }
+
   create() {
     this.backdrop = addBackdrop(this, { color: UI_COLORS.cream, accent: UI_COLORS.teal, secondary: UI_COLORS.amber });
     this.header = createHeader(
@@ -50,6 +56,7 @@ export default class MainMenuScene extends Phaser.Scene {
     const shadow = this.add.graphics().setDepth(5);
     const surface = this.add.graphics().setDepth(6);
     const icon = this.add.graphics().setDepth(8);
+    const pngIcon = this.add.image(0, 0, 'game3_main_icon').setOrigin(0.5).setDepth(9).setVisible(game.key === 'game3');
     const number = this.add.text(0, 0, `${completed ? '✓  ' : ''}OYUN ${game.number}`, {
       fontSize: '12px',
       color: '#49657d',
@@ -86,6 +93,16 @@ export default class MainMenuScene extends Phaser.Scene {
       surface.strokeRoundedRect(left, top - (state.over ? 3 : 0), width, height, radius);
       surface.fillStyle(completed ? 0x8fbda2 : game.color, completed ? 0.22 : 0.13);
       surface.fillRoundedRect(left + 14, top + 14 - (state.over ? 3 : 0), 66, height - 28, Math.min(17, radius));
+
+      if (game.key === 'game3') {
+        icon.clear();
+        pngIcon.setVisible(true);
+        const iconSize = Math.min(50, Math.max(32, height * 0.38));
+        pngIcon.setPosition(left + 47, y - (state.over ? 3 : 0)).setDisplaySize(iconSize, iconSize);
+        return;
+      }
+
+      pngIcon.setVisible(false);
       this._drawCardIcon(icon, game.icon, left + 47, y - (state.over ? 3 : 0), completed ? UI_COLORS.greenDark : game.color, height);
     };
 
@@ -120,7 +137,7 @@ export default class MainMenuScene extends Phaser.Scene {
       });
     }
 
-    const card = { game, index, completed, shadow, surface, icon, number, title, subtitle, action, hit, state, redraw };
+    const card = { game, index, completed, shadow, surface, icon, pngIcon, number, title, subtitle, action, hit, state, redraw };
     return card;
   }
 
