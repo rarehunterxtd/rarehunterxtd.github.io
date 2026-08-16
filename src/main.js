@@ -181,20 +181,35 @@ const queueScaleRefresh = () => {
 
     const { width, height } = readViewportSize();
     const renderScale = getRenderScale();
+    const expectedRenderWidth = Math.max(1, Math.round(width * renderScale));
+    const expectedRenderHeight = Math.max(1, Math.round(height * renderScale));
     const sizeChanged = lastViewportWidth !== width
       || lastViewportHeight !== height
-      || lastRenderScale !== renderScale;
+      || lastRenderScale !== renderScale
+      || game.canvas.width !== expectedRenderWidth
+      || game.canvas.height !== expectedRenderHeight;
 
     if (sizeChanged) {
       game.scale.resize(width, height);
       syncHighDpiRenderer(width, height);
     } else {
+      // Phaser sahne geçişleri sırasında ScaleManager canvas'ın satır içi CSS
+      // ölçüsünü kendi baseSize değeriyle yeniden yazabiliyor. Özellikle bir
+      // tamamlanma penceresinden menüye dönüp aynı oyuna tekrar girildiğinde
+      // canvas ekranın yalnızca bir bölümünü kaplayabiliyordu. Parent ölçüsü
+      // değişmemiş olsa bile CSS boyutunu yeniden doğrula.
+      if (game.canvas.style.width !== `${width}px`) game.canvas.style.width = `${width}px`;
+      if (game.canvas.style.height !== `${height}px`) game.canvas.style.height = `${height}px`;
       game.scale.updateBounds();
     }
 
     refreshTextResolution();
   });
 };
+
+// Sahneler geçişin hemen ardından (aynı animasyon karesinde) viewport'u tekrar
+// doğrulayabilsin. Fonksiyon yalnızca ölçüm ve güvenli bir resize kuyruğu yapar.
+window.__refreshGameViewport = queueScaleRefresh;
 
 // Bazı mobil tarayıcılar adres çubuğu, uygulama değişimi veya ekran kilidi
 // sonrasında pencere odak olayını geciktirebiliyor. İlk dokunuşta oyun döngüsünü

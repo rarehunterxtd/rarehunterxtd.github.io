@@ -52,6 +52,10 @@ export default class MiniGame2Scene extends Phaser.Scene {
     this.completionButton = null;
     this.transitioning = false;
     this.cameraSyncFrames = 0;
+    this._resizeHandler = null;
+    this._backgroundPointerHandler = null;
+    this._layoutWidth = 0;
+    this._layoutHeight = 0;
   }
 
   preload() {
@@ -70,7 +74,8 @@ export default class MiniGame2Scene extends Phaser.Scene {
 
   create() {
     this.transitioning = false;
-    this.cameraSyncFrames = 12;
+    this.cameraSyncFrames = 30;
+    window.__refreshGameViewport?.();
     this._syncCameraToCanvas();
     this.itemSprites = {};
     this.itemState = {};
@@ -85,6 +90,13 @@ export default class MiniGame2Scene extends Phaser.Scene {
     this.completionTitle = null;
     this.completionBody = null;
     this.completionButton = null;
+    this.bgFill = null;
+    this.bg = null;
+    this.infoBox = null;
+    this.infoBg = null;
+    this.infoText = null;
+    this._layoutWidth = 0;
+    this._layoutHeight = 0;
 
     // Match Mini Game 1's warm navy letterbox/pillarbox color.
     this.bgFill = this.add.rectangle(0, 0, this.scale.width, this.scale.height, 0x102a3d).setOrigin(0).setDepth(-100);
@@ -160,12 +172,13 @@ export default class MiniGame2Scene extends Phaser.Scene {
     this.scale.on('resize', this._resizeHandler);
 
     // Clicking anywhere hides info box
-    this.input.on('pointerdown', (pointer, currentlyOver) => {
+    this._backgroundPointerHandler = (pointer, currentlyOver) => {
       // If clicked on empty space (not on interactive), hide info
       if (!currentlyOver || currentlyOver.length === 0) {
-        this.infoBox.setVisible(false);
+        this.infoBox?.setVisible(false);
       }
-    });
+    };
+    this.input.on('pointerdown', this._backgroundPointerHandler);
 
     // Title text
     this.titleText = this.add.text(20, 20, 'Tehlikeyi Bul - Mini Oyun', {
@@ -184,15 +197,24 @@ export default class MiniGame2Scene extends Phaser.Scene {
   }
 
   _onShutdown() {
+    this.tweens?.killAll();
     if (this._resizeHandler) {
       this.scale.off('resize', this._resizeHandler);
       this._resizeHandler = null;
     }
+    if (this._backgroundPointerHandler) {
+      this.input.off('pointerdown', this._backgroundPointerHandler);
+      this._backgroundPointerHandler = null;
+    }
+    this.cameraSyncFrames = 0;
+    window.__refreshGameViewport?.();
   }
 
   _goToMainMenu() {
     if (this.transitioning) return;
     this.transitioning = true;
+    this.tweens?.killAll();
+    window.__refreshGameViewport?.();
     this.scene.start('MainMenu');
   }
 
@@ -215,12 +237,27 @@ export default class MiniGame2Scene extends Phaser.Scene {
     if (Math.abs(camera.zoom - renderScale) > 0.001) camera.setZoom(renderScale);
   }
 
+  _getViewportSize() {
+    const canvas = this.game?.canvas;
+    const parent = canvas?.parentElement;
+    const bounds = parent?.getBoundingClientRect?.() || canvas?.getBoundingClientRect?.();
+
+    return {
+      width: Math.max(1, Math.round(bounds?.width || window.innerWidth || this.scale.width)),
+      height: Math.max(1, Math.round(bounds?.height || window.innerHeight || this.scale.height))
+    };
+  }
+
   update() {
     // Hızlı sahne geçişinde yeni kamera ilk PRE_RENDER olayından önce oluşabilir.
     // İlk birkaç karede oranı doğrula; sonrasında gereksiz DOM ölçümü yapma.
     if (this.cameraSyncFrames > 0) {
       this.cameraSyncFrames -= 1;
       this._syncCameraToCanvas();
+      const viewport = this._getViewportSize();
+      if (viewport.width !== this._layoutWidth || viewport.height !== this._layoutHeight) {
+        this.resizeElements(viewport.width, viewport.height);
+      }
     }
   }
 
@@ -246,6 +283,13 @@ export default class MiniGame2Scene extends Phaser.Scene {
   }
 
   resizeElements(width, height) {
+    const viewport = this._getViewportSize();
+    // ScaleManager'ın sahne değişiminden kalan render-piksel ölçüsü yerine
+    // her zaman gerçek CSS viewport ölçüsünü kullan.
+    width = viewport.width;
+    height = viewport.height;
+    this._layoutWidth = width;
+    this._layoutHeight = height;
     this._syncCameraToCanvas();
     const compact = width < 620;
     const portraitLayout = compact && height > width * 1.2;
