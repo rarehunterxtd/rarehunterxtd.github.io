@@ -31,8 +31,8 @@ export default class MiniGame4Scene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.image(VENT_KEY, assetUrl('menfez_placeholder.png'));
-    this.load.image(OBSTACLE_KEY, assetUrl('engel_placeholder.png'));
+    this.load.image(VENT_KEY, assetUrl('menfez.png'));
+    this.load.image(OBSTACLE_KEY, assetUrl('engel.png'));
     GAZO_KEYS.forEach((key, idx) => {
       this.load.image(key, assetUrl(`gazo_stage${idx + 1}.png`));
     });
@@ -139,6 +139,7 @@ export default class MiniGame4Scene extends Phaser.Scene {
       const distance = Phaser.Math.Distance.Between(homeX, homeY, gameObject.x, gameObject.y);
 
       if (distance >= 80) {
+        this._forceEndPointerDrag(pointer);
         gameObject.setData('removed', true);
         gameObject.disableInteractive();
         this.input.setDraggable(gameObject, false);
@@ -155,6 +156,7 @@ export default class MiniGame4Scene extends Phaser.Scene {
 
         this._advanceStage();
       } else {
+        this._forceEndPointerDrag(pointer);
         this.tweens.add({
           targets: gameObject,
           x: homeX,
@@ -182,6 +184,17 @@ export default class MiniGame4Scene extends Phaser.Scene {
     this._onResize(width, height);
   }
 
+  _forceEndPointerDrag(pointer) {
+    if (!pointer) return;
+    if (typeof this.input?.setDragState === 'function') {
+      this.input.setDragState(pointer, 0);
+      return;
+    }
+    if (typeof pointer.dragState === 'number') {
+      pointer.dragState = 0;
+    }
+  }
+
   _advanceStage() {
     if (this.completed) return;
 
@@ -196,6 +209,7 @@ export default class MiniGame4Scene extends Phaser.Scene {
         onComplete: () => {
           this.gazo.setTexture(nextKey);
           this.gazo.setAlpha(1);
+          this._onResize(this.scale.width, this.scale.height);
         }
       });
     }
@@ -241,10 +255,16 @@ export default class MiniGame4Scene extends Phaser.Scene {
 
     if (this.gazo) {
       this.gazo.setPosition(Math.round(width / 2), Math.round(height / 2));
-      const targetSize = Math.round(Math.min(width, height) * 0.28);
-      this.gazo.setDisplaySize(targetSize, targetSize);
+      const targetHeight = Math.round(Math.min(width, height) * 0.34);
+      const sourceImage = this.gazo.texture?.getSourceImage?.();
+      const sourceW = sourceImage?.width || this.gazo.width || 1;
+      const sourceH = sourceImage?.height || this.gazo.height || 1;
+      const aspect = sourceW / sourceH;
+      const targetWidth = Math.round(targetHeight * aspect);
+
+      this.gazo.setDisplaySize(targetWidth, targetHeight);
       this.gazoFrame?.setPosition(Math.round(width / 2), Math.round(height / 2));
-      this.gazoFrame?.resizePanel(targetSize + 32, targetSize + 32);
+      this.gazoFrame?.resizePanel(targetWidth + 32, targetHeight + 32);
     }
 
     const ventSize = Math.round(Math.min(width, height) * 0.14);
