@@ -186,9 +186,7 @@ export default class MiniGame2Scene extends Phaser.Scene {
     if (Object.values(this.itemState).every(Boolean)) {
       this._markGameCompleted();
       // Show completion UI after a short delay so completion state is perceived first
-      this.time.delayedCall(5000, () => {
-        this._showCompletionUI();
-      });
+      this._showCompletionUI();
     }
   }
 
