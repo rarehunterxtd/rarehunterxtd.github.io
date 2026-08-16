@@ -1,6 +1,9 @@
 import Phaser from 'phaser';
 import { addBackdrop, createButton, createPanel, pulseSuccess, shakeSoft, UI_COLORS } from '../../ui/gameUi.js';
 
+const assetUrl = (file) => `${import.meta.env.BASE_URL}assets/game3/${file}`;
+const ICON_KEY_PREFIX = 'game3_icon_';
+
 const OPTIONS = [
   { id: 'card1', label: 'Gaz vanasını kapat', icon: 'valve' },
   { id: 'card2', label: 'Elektrik düğmesine dokun', icon: 'switch', wrongMsg: 'Elektrik düğmeleri kıvılcım oluşturabilir.' },
@@ -19,6 +22,15 @@ export default class MiniGame3Scene extends Phaser.Scene {
     this.slots = [];
     this.completed = false;
     this.draggingCard = null;
+  }
+
+  preload() {
+    OPTIONS.forEach(({ icon }) => {
+      const key = `${ICON_KEY_PREFIX}${icon}`;
+      if (!this.textures.exists(key)) {
+        this.load.image(key, assetUrl(`${icon}.png`));
+      }
+    });
   }
 
   create() {
@@ -107,7 +119,7 @@ export default class MiniGame3Scene extends Phaser.Scene {
       color: '#b94f3c',
       fontStyle: 'bold'
     }).setOrigin(0.5);
-    const icon = this.add.graphics();
+    const icon = this.add.image(0, 0, `${ICON_KEY_PREFIX}${option.icon}`).setOrigin(0.5);
     const label = this.add.text(0, 0, option.label, {
       fontSize: '16px',
       color: '#17324d',
@@ -180,63 +192,6 @@ export default class MiniGame3Scene extends Phaser.Scene {
       hint
     });
     this.slots.push(slot);
-  }
-
-  _drawIcon(graphics, type, size) {
-    graphics.clear();
-    const color = UI_COLORS.coral;
-    const dark = UI_COLORS.coralDark;
-    const line = Math.max(3, Math.round(size * 0.07));
-    const half = size / 2;
-    graphics.lineStyle(line, dark, 1);
-
-    if (type === 'valve') {
-      graphics.strokeCircle(0, 0, half * 0.62);
-      graphics.lineBetween(-half * 0.6, 0, half * 0.6, 0);
-      graphics.lineBetween(0, -half * 0.6, 0, half * 0.6);
-      graphics.fillStyle(color, 1).fillCircle(0, 0, line * 1.2);
-    } else if (type === 'switch') {
-      graphics.strokeRoundedRect(-half * 0.55, -half * 0.72, size * 0.55, size * 0.9, 7);
-      graphics.lineBetween(-half * 0.28, -half * 0.38, -half * 0.28, -half * 0.08);
-      graphics.fillStyle(color, 1).fillCircle(-half * 0.28, half * 0.36, line * 1.25);
-    } else if (type === 'window') {
-      graphics.strokeRect(-half * 0.72, -half * 0.65, size * 0.92, size * 0.92);
-      graphics.lineBetween(-half * 0.26, -half * 0.65, -half * 0.26, half * 0.27);
-      graphics.lineBetween(-half * 0.72, -half * 0.19, half * 0.2, -half * 0.19);
-      graphics.lineBetween(half * 0.34, -half * 0.34, half * 0.74, -half * 0.62);
-      graphics.lineBetween(half * 0.34, 0, half * 0.84, 0);
-      graphics.lineBetween(half * 0.34, half * 0.34, half * 0.74, half * 0.62);
-    } else if (type === 'flame') {
-      graphics.beginPath();
-      graphics.moveTo(0, -half * 0.82);
-      graphics.lineTo(half * 0.5, -half * 0.05);
-      graphics.lineTo(half * 0.32, half * 0.65);
-      graphics.lineTo(0, half * 0.82);
-      graphics.lineTo(-half * 0.5, half * 0.35);
-      graphics.lineTo(-half * 0.28, -half * 0.18);
-      graphics.closePath();
-      graphics.fillStyle(color, 0.18).fillPath();
-      graphics.strokePath();
-    } else if (type === 'exit') {
-      graphics.strokeRect(-half * 0.68, -half * 0.72, size * 0.72, size * 1.35);
-      graphics.lineBetween(-half * 0.1, 0, half * 0.78, 0);
-      graphics.lineBetween(half * 0.78, 0, half * 0.4, -half * 0.34);
-      graphics.lineBetween(half * 0.78, 0, half * 0.4, half * 0.34);
-    } else {
-      graphics.beginPath();
-      graphics.moveTo(-half * 0.5, -half * 0.72);
-      graphics.lineTo(-half * 0.18, -half * 0.82);
-      graphics.lineTo(half * 0.08, -half * 0.35);
-      graphics.lineTo(-half * 0.08, -half * 0.08);
-      graphics.lineTo(half * 0.35, half * 0.42);
-      graphics.lineTo(half * 0.62, half * 0.25);
-      graphics.lineTo(half * 0.78, half * 0.58);
-      graphics.lineTo(half * 0.38, half * 0.82);
-      graphics.lineTo(-half * 0.58, -half * 0.22);
-      graphics.closePath();
-      graphics.fillStyle(color, 0.16).fillPath();
-      graphics.strokePath();
-    }
   }
 
   _handleDragStart(pointer, object) {
@@ -393,8 +348,10 @@ export default class MiniGame3Scene extends Phaser.Scene {
       card.setSize(cardWidth, cardHeight);
       card.getData('panel').resizePanel(cardWidth, cardHeight);
       card.getData('badge').setPosition(-cardWidth / 2 + 22, -cardHeight / 2 + 19);
-      card.getData('icon').setPosition(0, -cardHeight * 0.13);
-      this._drawIcon(card.getData('icon'), card.getData('option').icon, Math.min(58, cardWidth * 0.34));
+      const iconSize = Math.round(Math.min(58, cardWidth * 0.34));
+      card.getData('icon')
+        .setPosition(0, -cardHeight * 0.13)
+        .setDisplaySize(iconSize, iconSize);
       card.getData('label')
         .setPosition(0, cardHeight * 0.3)
         .setFontSize(compact ? 11 : Phaser.Math.Clamp(cardWidth * 0.09, 13, 17))
