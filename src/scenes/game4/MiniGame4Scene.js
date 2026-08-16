@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { addBackdrop, createButton, createPanel, pulseSuccess, UI_COLORS } from '../../ui/gameUi.js';
 
+const assetUrl = (file) => `${import.meta.env.BASE_URL}assets/game4/${file}`;
+
 const VENT_KEY = 'game4_menfez';
 const OBSTACLE_KEY = 'game4_engel';
 const GAZO_KEYS = ['gazo_stage1', 'gazo_stage2', 'gazo_stage3', 'gazo_stage4', 'gazo_stage5'];
@@ -29,10 +31,10 @@ export default class MiniGame4Scene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.image(VENT_KEY, '/assets/game4/menfez_placeholder.png');
-    this.load.image(OBSTACLE_KEY, '/assets/game4/engel_placeholder.png');
+    this.load.image(VENT_KEY, assetUrl('menfez_placeholder.png'));
+    this.load.image(OBSTACLE_KEY, assetUrl('engel_placeholder.png'));
     GAZO_KEYS.forEach((key, idx) => {
-      this.load.image(key, `/assets/game4/gazo_stage${idx + 1}.png`);
+      this.load.image(key, assetUrl(`gazo_stage${idx + 1}.png`));
     });
   }
 
