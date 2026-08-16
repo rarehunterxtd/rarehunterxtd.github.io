@@ -2,21 +2,37 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Güvenli Doğal Gaz Kullanımı - Mini Oyunlar</title>
   <style>
-    html, body, #game-container {
-      width: 100%;
+    html, body {
+      width: 100vw;
       height: 100%;
       margin: 0;
       padding: 0;
-      background: #222;
+      background: #f7f4ea;
       overflow: hidden;
+      overscroll-behavior: none;
     }
+
     #game-container {
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      background: #f7f4ea;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    #game-container canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      max-width: none;
+      max-height: none;
+      image-rendering: auto;
     }
   </style>
 </head>

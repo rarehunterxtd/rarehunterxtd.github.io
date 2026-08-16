@@ -12,6 +12,10 @@ const DEFAULT_TEXT_STYLE = {
   fontFamily: 'Trebuchet MS, sans-serif'
 };
 
+// Phaser Text nesnelerini retina / yüksek DPI ekranlarda keskin tutar.
+// 2x sınırı, özellikle 4K mobil cihazlarda bellek kullanımının büyümesini önler.
+const getTextResolution = () => Phaser.Math.Clamp(window.devicePixelRatio || 1, 1, 2);
+
 if (!Phaser.GameObjects.GameObjectFactory.prototype.__gazmerTextPatched) {
   const originalText = Phaser.GameObjects.GameObjectFactory.prototype.text;
 
@@ -23,6 +27,7 @@ if (!Phaser.GameObjects.GameObjectFactory.prototype.__gazmerTextPatched) {
   ) {
     return originalText.call(this, x, y, text, {
       ...DEFAULT_TEXT_STYLE,
+      resolution: getTextResolution(),
       ...style
     });
   };
@@ -30,31 +35,22 @@ if (!Phaser.GameObjects.GameObjectFactory.prototype.__gazmerTextPatched) {
   Phaser.GameObjects.GameObjectFactory.prototype.__gazmerTextPatched = true;
 }
 
-const getDpr = () => Math.min(window.devicePixelRatio || 1, 2);
-
-const getPhysicalSize = () => ({
-  width: Math.max(1, Math.round(window.innerWidth * getDpr())),
-  height: Math.max(1, Math.round(window.innerHeight * getDpr()))
-});
-
-const initialSize = getPhysicalSize();
-
 const config = {
   type: Phaser.AUTO,
-
-  // Phaser'ın internal resolution'ı DPR ile yüksek tutuluyor.
-  width: initialSize.width,
-  height: initialSize.height,
-
   pixelArt: false,
   antialias: true,
-
-  backgroundColor: '#222',
+  backgroundColor: '#f7f4ea',
   parent: 'game-container',
 
   scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH
+    parent: 'game-container',
+    mode: Phaser.Scale.RESIZE,
+    width: '100%',
+    height: '100%',
+    autoCenter: Phaser.Scale.NO_CENTER,
+    autoRound: true,
+    expandParent: false,
+    fullscreenTarget: 'game-container'
   },
 
   scene: [
@@ -69,16 +65,45 @@ const config = {
   ]
 };
 
-window.addEventListener('load', () => {
-  window.game = new Phaser.Game(config);
+const gameContainer = document.getElementById('game-container');
+const game = new Phaser.Game(config);
+window.game = game;
 
-  // Ekran boyutu değiştiğinde Phaser'ın fiziksel game size'ını
-  // viewport × DPR olarak güncelle.
-  window.addEventListener('resize', () => {
-    if (!window.game) return;
+let refreshFrame = 0;
+let lastTextResolution = getTextResolution();
 
-    const size = getPhysicalSize();
+const refreshTextResolution = () => {
+  const nextResolution = getTextResolution();
+  if (nextResolution === lastTextResolution) return;
 
-    window.game.scale.resize(size.width, size.height);
+  lastTextResolution = nextResolution;
+  game.scene.getScenes(true).forEach((scene) => {
+    scene.children?.list.forEach((child) => {
+      if (child instanceof Phaser.GameObjects.Text) {
+        child.setResolution(nextResolution);
+      }
+    });
   });
-});
+};
+
+// Pencere, yön, tarayıcı tam ekranı ve parent ölçüsü değişikliklerini tek
+// animasyon karesinde birleştirir. refresh(), RESIZE modunun güncel parent
+// ölçülerini sahnelere Phaser.Scale.Events.RESIZE olarak iletmesini sağlar.
+const queueScaleRefresh = () => {
+  window.cancelAnimationFrame(refreshFrame);
+  refreshFrame = window.requestAnimationFrame(() => {
+    if (!game.scale?.canvas) return;
+    game.scale.refresh();
+    refreshTextResolution();
+  });
+};
+
+const resizeObserver = new ResizeObserver(queueScaleRefresh);
+resizeObserver.observe(gameContainer);
+
+window.addEventListener('resize', queueScaleRefresh, { passive: true });
+window.addEventListener('orientationchange', queueScaleRefresh, { passive: true });
+window.visualViewport?.addEventListener('resize', queueScaleRefresh, { passive: true });
+document.addEventListener('fullscreenchange', queueScaleRefresh);
+
+queueScaleRefresh();
