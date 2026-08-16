@@ -12,35 +12,51 @@ const DEFAULT_TEXT_STYLE = {
   fontFamily: 'Trebuchet MS, sans-serif'
 };
 
-//const RENDER_DPR = window.devicePixelRatio || 1;
-
 if (!Phaser.GameObjects.GameObjectFactory.prototype.__gazmerTextPatched) {
   const originalText = Phaser.GameObjects.GameObjectFactory.prototype.text;
-  Phaser.GameObjects.GameObjectFactory.prototype.text = function (x, y, text, style = {}) {
-    const textObject = originalText.call(this, x, y, text, {
+
+  Phaser.GameObjects.GameObjectFactory.prototype.text = function (
+    x,
+    y,
+    text,
+    style = {}
+  ) {
+    return originalText.call(this, x, y, text, {
       ...DEFAULT_TEXT_STYLE,
       ...style
     });
-    //textObject.setResolution(RENDER_DPR);
-    return textObject;
   };
+
   Phaser.GameObjects.GameObjectFactory.prototype.__gazmerTextPatched = true;
 }
 
+const getDpr = () => Math.min(window.devicePixelRatio || 1, 2);
+
+const getPhysicalSize = () => ({
+  width: Math.max(1, Math.round(window.innerWidth * getDpr())),
+  height: Math.max(1, Math.round(window.innerHeight * getDpr()))
+});
+
+const initialSize = getPhysicalSize();
+
 const config = {
-  type: Phaser.WEBGL,
-  width: window.innerWidth,
-  height: window.innerHeight,
-  // Match the render buffer to device pixel density for sharper output on mobile.
-  //resolution: RENDER_DPR,
+  type: Phaser.AUTO,
+
+  // Phaser'ın internal resolution'ı DPR ile yüksek tutuluyor.
+  width: initialSize.width,
+  height: initialSize.height,
+
   pixelArt: false,
   antialias: true,
+
   backgroundColor: '#222',
   parent: 'game-container',
+
   scale: {
-    mode: Phaser.Scale.RESIZE,
+    mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
   },
+
   scene: [
     MainMenuScene,
     Game2MainMenuScene,
@@ -55,4 +71,14 @@ const config = {
 
 window.addEventListener('load', () => {
   window.game = new Phaser.Game(config);
+
+  // Ekran boyutu değiştiğinde Phaser'ın fiziksel game size'ını
+  // viewport × DPR olarak güncelle.
+  window.addEventListener('resize', () => {
+    if (!window.game) return;
+
+    const size = getPhysicalSize();
+
+    window.game.scale.resize(size.width, size.height);
+  });
 });
