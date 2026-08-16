@@ -19,6 +19,7 @@ export default class MainMenuScene extends Phaser.Scene {
     this.allGamesCelebratedKey = 'allGamesCelebrated';
     this.celebration = null;
     this._resizeHandler = null;
+    this.transitioning = false;
   }
 
   preload() {
@@ -28,6 +29,7 @@ export default class MainMenuScene extends Phaser.Scene {
   }
 
   create() {
+    this.transitioning = false;
     this.backdrop = addBackdrop(this, { color: UI_COLORS.cream, accent: UI_COLORS.teal, secondary: UI_COLORS.amber });
     this.header = createHeader(
       this,
@@ -136,6 +138,9 @@ export default class MainMenuScene extends Phaser.Scene {
         this.tweens.add({ targets: [number, title, subtitle, action], scaleX: 0.985, scaleY: 0.985, duration: 60 });
       });
       hit.on('pointerup', () => {
+        if (this.transitioning) return;
+        this.transitioning = true;
+        hit.disableInteractive();
         state.down = false;
         surface.setAlpha(1);
         this.tweens.add({

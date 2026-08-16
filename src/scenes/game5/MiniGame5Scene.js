@@ -317,18 +317,18 @@ export default class MiniGame5Scene extends Phaser.Scene {
     }
 
     const meterWidth = Math.round(compact
-      ? Math.min(width * 0.78, height * 0.5)
-      : Math.min(width * 0.5, height * 0.64));
+      ? Math.min(width * 0.86, height * 0.56)
+      : Math.min(width * 0.56, height * 0.72));
     const meterHeight = Math.round(meterWidth * (349 / 667));
     const needleHeight = Math.round(meterHeight * 0.72);
-    const valveWidth = Math.round(meterWidth * (compact ? 0.42 : 0.36));
+    const valveWidth = Math.round(meterWidth * (compact ? 0.3 : 0.24));
     const centerX = Math.round(width / 2);
     const centerY = Math.round(height * (compact ? 0.39 : 0.48));
 
     if (this.valve) {
       const source = this.valve.texture.getSourceImage();
       const scale = valveWidth / Math.max(1, source.width);
-      this.valve.setPosition(centerX, centerY + Math.round(meterHeight * 0.86));
+      this.valve.setPosition(centerX, centerY + Math.round(meterHeight * 0.83));
       this.valve.setScale(scale);
     }
 
@@ -359,17 +359,19 @@ export default class MiniGame5Scene extends Phaser.Scene {
     }
 
     if (this.leftButton) {
-      const x = compact ? 48 : centerX - Math.round(meterWidth * 0.7);
-      this.leftButton.bg.setDisplaySize(compact ? 62 : 88, compact ? 62 : 88);
-      this.leftButton.bg.setPosition(x, centerY);
-      this.leftButton.text.setPosition(x, centerY).setFontSize(compact ? 31 : 38);
+      const x = compact ? 58 : centerX - Math.round(meterWidth * 0.68);
+      const controlsY = compact ? centerY + Math.round(meterHeight * 0.83) : centerY;
+      this.leftButton.bg.setDisplaySize(compact ? 58 : 88, compact ? 58 : 88);
+      this.leftButton.bg.setPosition(x, controlsY);
+      this.leftButton.text.setPosition(x, controlsY).setFontSize(compact ? 29 : 38);
     }
 
     if (this.rightButton) {
-      const x = compact ? width - 48 : centerX + Math.round(meterWidth * 0.7);
-      this.rightButton.bg.setDisplaySize(compact ? 62 : 88, compact ? 62 : 88);
-      this.rightButton.bg.setPosition(x, centerY);
-      this.rightButton.text.setPosition(x, centerY).setFontSize(compact ? 31 : 38);
+      const x = compact ? width - 58 : centerX + Math.round(meterWidth * 0.68);
+      const controlsY = compact ? centerY + Math.round(meterHeight * 0.83) : centerY;
+      this.rightButton.bg.setDisplaySize(compact ? 58 : 88, compact ? 58 : 88);
+      this.rightButton.bg.setPosition(x, controlsY);
+      this.rightButton.text.setPosition(x, controlsY).setFontSize(compact ? 29 : 38);
     }
 
     if (this.overlay) {

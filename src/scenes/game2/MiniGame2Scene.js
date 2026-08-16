@@ -50,6 +50,8 @@ export default class MiniGame2Scene extends Phaser.Scene {
     this.completionTitle = null;
     this.completionBody = null;
     this.completionButton = null;
+    this.transitioning = false;
+    this.cameraSyncFrames = 0;
   }
 
   preload() {
@@ -67,9 +69,22 @@ export default class MiniGame2Scene extends Phaser.Scene {
   }
 
   create() {
+    this.transitioning = false;
+    this.cameraSyncFrames = 12;
+    this._syncCameraToCanvas();
     this.itemSprites = {};
     this.itemState = {};
     this.completed = false;
+    // Scene nesnesi yeniden kullanılır. Önceki çalıştırmada Phaser tarafından
+    // yok edilen başlık/düğme referansları kalırsa ilk responsive yerleşim
+    // bunları güncellemeye çalışıp create akışını yarıda kesebilir.
+    this.titleText = null;
+    this.mainMenuButton = null;
+    this.completionOverlay = null;
+    this.completionPanel = null;
+    this.completionTitle = null;
+    this.completionBody = null;
+    this.completionButton = null;
 
     // Match Mini Game 1's warm navy letterbox/pillarbox color.
     this.bgFill = this.add.rectangle(0, 0, this.scale.width, this.scale.height, 0x102a3d).setOrigin(0).setDepth(-100);
@@ -111,7 +126,7 @@ export default class MiniGame2Scene extends Phaser.Scene {
     const completeButton = createButton(this, {
       x: this.scale.width / 2, y: this.scale.height / 2 + 72, width: 228, height: 54,
       label: 'Ana Menüye Dön  ›', fill: UI_COLORS.green, stroke: 0xd8f5e3,
-      depth: 5002, onClick: () => this.scene.start('MainMenu')
+      depth: 5002, onClick: () => this._goToMainMenu()
     });
     completeButton.bg.setVisible(false);
     this.completionButton = completeButton;
@@ -160,7 +175,7 @@ export default class MiniGame2Scene extends Phaser.Scene {
     const menuButton = createButton(this, {
       x: this.scale.width - 92, y: 34, width: 164, height: 46, label: '←  Ana Menü',
       fill: UI_COLORS.navy, stroke: 0x9ccbd2, fontSize: 15, depth: 300,
-      onClick: () => this.scene.start('MainMenu')
+      onClick: () => this._goToMainMenu()
     });
     this.mainMenuButton = { rect: menuButton.bg, txt: menuButton.text };
 
@@ -172,6 +187,40 @@ export default class MiniGame2Scene extends Phaser.Scene {
     if (this._resizeHandler) {
       this.scale.off('resize', this._resizeHandler);
       this._resizeHandler = null;
+    }
+  }
+
+  _goToMainMenu() {
+    if (this.transitioning) return;
+    this.transitioning = true;
+    this.scene.start('MainMenu');
+  }
+
+  _syncCameraToCanvas() {
+    const canvas = this.game?.canvas;
+    const camera = this.cameras?.main;
+    if (!canvas || !camera) return;
+
+    const bounds = canvas.getBoundingClientRect();
+    const cssWidth = Math.max(1, bounds.width || window.innerWidth);
+    const cssHeight = Math.max(1, bounds.height || window.innerHeight);
+    const renderWidth = Math.max(1, canvas.width);
+    const renderHeight = Math.max(1, canvas.height);
+    const renderScale = Math.min(renderWidth / cssWidth, renderHeight / cssHeight);
+
+    if (camera.width !== renderWidth || camera.height !== renderHeight) {
+      camera.setViewport(0, 0, renderWidth, renderHeight);
+    }
+    if (camera.originX !== 0 || camera.originY !== 0) camera.setOrigin(0, 0);
+    if (Math.abs(camera.zoom - renderScale) > 0.001) camera.setZoom(renderScale);
+  }
+
+  update() {
+    // Hızlı sahne geçişinde yeni kamera ilk PRE_RENDER olayından önce oluşabilir.
+    // İlk birkaç karede oranı doğrula; sonrasında gereksiz DOM ölçümü yapma.
+    if (this.cameraSyncFrames > 0) {
+      this.cameraSyncFrames -= 1;
+      this._syncCameraToCanvas();
     }
   }
 
@@ -197,6 +246,7 @@ export default class MiniGame2Scene extends Phaser.Scene {
   }
 
   resizeElements(width, height) {
+    this._syncCameraToCanvas();
     const compact = width < 620;
     const portraitLayout = compact && height > width * 1.2;
 
