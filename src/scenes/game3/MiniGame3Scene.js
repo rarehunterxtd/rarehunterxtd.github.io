@@ -94,7 +94,9 @@ export default class MiniGame3Scene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(500).setVisible(false);
 
     this._createCompletionUI(width, height);
-    this._layout(width, height, false);
+    // Sahne doğrudan mobil ölçüde açıldığında da responsive yazı ve düğme
+    // boyutlarını ilk kareden önce uygula.
+    this._onResize(width, height, false);
     this._animateEntrance();
 
     this.input.on('dragstart', this._handleDragStart, this);
@@ -468,7 +470,7 @@ export default class MiniGame3Scene extends Phaser.Scene {
     });
   }
 
-  _onResize(width, height) {
+  _onResize(width, height, animate = true) {
     const compact = width < 620;
     this.backdrop?.resize(width, height);
     this.eyebrowText
@@ -491,7 +493,7 @@ export default class MiniGame3Scene extends Phaser.Scene {
     this.completionOverlay?.setDisplaySize(width, height).setPosition(0, 0);
     this.completionPanel?.setPosition(width / 2, height / 2);
     this.completionButton?.bg.setPosition(width / 2, height / 2 + 70);
-    this._layout(width, height);
+    this._layout(width, height, animate);
   }
 
   _onShutdown() {
