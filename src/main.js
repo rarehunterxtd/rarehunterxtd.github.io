@@ -12,21 +12,29 @@ const DEFAULT_TEXT_STYLE = {
   fontFamily: 'Trebuchet MS, sans-serif'
 };
 
+//const RENDER_DPR = window.devicePixelRatio || 1;
+
 if (!Phaser.GameObjects.GameObjectFactory.prototype.__gazmerTextPatched) {
   const originalText = Phaser.GameObjects.GameObjectFactory.prototype.text;
   Phaser.GameObjects.GameObjectFactory.prototype.text = function (x, y, text, style = {}) {
-    return originalText.call(this, x, y, text, {
+    const textObject = originalText.call(this, x, y, text, {
       ...DEFAULT_TEXT_STYLE,
       ...style
     });
+    //textObject.setResolution(RENDER_DPR);
+    return textObject;
   };
   Phaser.GameObjects.GameObjectFactory.prototype.__gazmerTextPatched = true;
 }
 
 const config = {
-  type: Phaser.AUTO,
-  width: 800,
-  height: 600,
+  type: Phaser.WEBGL,
+  width: window.innerWidth,
+  height: window.innerHeight,
+  // Match the render buffer to device pixel density for sharper output on mobile.
+  //resolution: RENDER_DPR,
+  pixelArt: false,
+  antialias: true,
   backgroundColor: '#222',
   parent: 'game-container',
   scale: {
@@ -46,5 +54,5 @@ const config = {
 };
 
 window.addEventListener('load', () => {
-  new Phaser.Game(config);
+  window.game = new Phaser.Game(config);
 });
