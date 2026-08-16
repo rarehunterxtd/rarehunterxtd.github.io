@@ -123,15 +123,16 @@ export default class MiniGame1Scene extends Phaser.Scene {
 
     // medya sahnesi dinamik olarak _renderCurrentScenario içinde oluşturulacak
 
-    // Feedback text (gizli)
-    // depth 156: above result image (150) and scenario text (155), below option buttons (160+)
+    // Feedback text (gizli). Mobilde açıklama alanının yerini alır; böylece
+    // seçenek düğmelerinin arkasında kalmaz.
     this.feedbackText = this.add.text(width / 2, height - 140, '', {
       fontSize: '20px', color: '#fff', backgroundColor: '#17324d', padding: { x: 18, y: 11 },
       align: 'center', wordWrap: { width: Math.max(220, width - 48) }
-    }).setOrigin(0.5).setVisible(false).setDepth(156);
+    }).setOrigin(0.5).setVisible(false).setDepth(190);
 
     // Seçenek butonlarını oluştur
     this._renderCurrentScenario();
+    this._onResize(width, height);
 
     // Resize handler
     this._resizeHandler = (gameSize) => {
@@ -206,6 +207,7 @@ export default class MiniGame1Scene extends Phaser.Scene {
     this.feedbackText.setText(`${correct ? '✓' : '↻'}  ${msg}`);
     this.feedbackText.setStyle({ backgroundColor: correct ? '#2f7c50' : '#b95e43' });
     this.feedbackText.setVisible(true);
+    this.scenarioText?.setVisible(false);
     if (correct) pulseSuccess(this, [rect.face, rect.shadow, this.feedbackText]);
     else shakeSoft(this, rect.face);
 
@@ -247,6 +249,7 @@ export default class MiniGame1Scene extends Phaser.Scene {
       // Yanlışsa, kısa gösterip normal duruma dön
       this.time.delayedCall(1600, () => {
         this.feedbackText.setVisible(false);
+        this.scenarioText?.setVisible(true);
         this.optionButtons.forEach(b => {
           b.rect.setFillStyle(UI_COLORS.blue);
           b.rect.setInteractive({ useHandCursor: true });
@@ -319,13 +322,19 @@ export default class MiniGame1Scene extends Phaser.Scene {
 
     // Senaryo açıklama metnini oluştur (video/resim üzerinde orta-alt konumda)
     if (s.text) {
-      const style = { fontSize: '20px', color: '#fff', align: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: { x: 12, y: 8 } };
+      const compact = width < 620;
+      const style = {
+        fontSize: compact ? '14px' : '20px',
+        color: '#fff',
+        align: 'center',
+        backgroundColor: compact ? 'rgba(11,31,48,0.96)' : 'rgba(0,0,0,0.5)',
+        padding: { x: compact ? 10 : 12, y: compact ? 6 : 8 }
+      };
       // depth 155 so it's above the result image (150) but below option buttons (160+)
       const mediaBounds = this._getMediaBounds(width, height);
       const textWidth = Math.max(180, mediaBounds.width - 48);
       this.scenarioText = this.add.text(mediaBounds.x, mediaBounds.bottom - 46, s.text, style).setOrigin(0.5).setDepth(155);
-      this.scenarioText.setWordWrapWidth(textWidth);
-      this._fitTextToWidth(this.scenarioText, textWidth);
+      this._positionScenarioText(width, height);
     }
 
     // seçenekleri oluştur
@@ -392,11 +401,33 @@ export default class MiniGame1Scene extends Phaser.Scene {
       this.resultImage.setPosition(mediaBounds.x, mediaBounds.y);
     }
 
-    // Reposition scenario overlay text
-    if (this.scenarioText) {
-      const textWidth = Math.max(180, mediaBounds.width - 48);
-      this.scenarioText.setPosition(mediaBounds.x, mediaBounds.bottom - 46);
-      this.scenarioText.setWordWrapWidth(textWidth);
+    this._positionScenarioText(width, height);
+  }
+
+  _positionScenarioText(width, height) {
+    if (!this.scenarioText) return;
+    const compact = width < 620;
+    const mediaBounds = this._getMediaBounds(width, height);
+    const textWidth = compact
+      ? Math.max(220, Math.min(mediaBounds.width - 20, width - 32))
+      : Math.max(180, mediaBounds.width - 48);
+
+    this.scenarioText
+      .setOrigin(0.5, compact ? 0 : 0.5)
+      .setPosition(mediaBounds.x, compact ? mediaBounds.bottom + 14 : mediaBounds.bottom - 46)
+      .setFontSize(compact ? 14 : 20)
+      .setLineSpacing(compact ? 1 : 0)
+      .setPadding(compact ? 10 : 12, compact ? 6 : 8)
+      .setBackgroundColor(compact ? 'rgba(11,31,48,0.96)' : 'rgba(0,0,0,0.5)')
+      .setWordWrapWidth(textWidth);
+
+    if (compact) {
+      let fontSize = 14;
+      while (this.scenarioText.height > 72 && fontSize > 11) {
+        fontSize -= 1;
+        this.scenarioText.setFontSize(fontSize);
+      }
+    } else {
       this._fitTextToWidth(this.scenarioText, textWidth);
     }
   }
@@ -520,21 +551,23 @@ export default class MiniGame1Scene extends Phaser.Scene {
       this.mediaFrame?.setPosition(mediaBounds.x, mediaBounds.y);
       this.mediaFrame?.resizePanel(mediaBounds.width + 16, mediaBounds.height + 16);
 
-      // feedback konum
-      if (this.feedbackText) this.feedbackText.setPosition(width / 2, height - 140);
+      const compact = width < 620;
 
-      // scenario text konum
-      if (this.scenarioText) {
-        const textWidth = Math.max(180, mediaBounds.width - 48);
-        this.scenarioText.setPosition(mediaBounds.x, mediaBounds.bottom - 46);
-        this.scenarioText.setWordWrapWidth(textWidth);
-        this._fitTextToWidth(this.scenarioText, textWidth);
+      if (this.feedbackText) {
+        this.feedbackText
+          .setPosition(width / 2, compact ? mediaBounds.bottom + 48 : height - 140)
+          .setFontSize(compact ? 15 : 20)
+          .setPadding(compact ? 12 : 18, compact ? 8 : 11)
+          .setWordWrapWidth(Math.max(220, width - (compact ? 36 : 48)))
+          .setDepth(190);
       }
+
+      this._positionScenarioText(width, height);
 
       // seçenekleri yeniden yerleştir
       if (this.optionButtons && this.optionButtons.length) {
         const count = this.optionButtons.length;
-        const stacked = width < 620;
+        const stacked = compact;
         const padding = stacked ? 22 : 32;
         const spacing = stacked ? 10 : 16;
         const availableW = width - padding * 2 - (stacked ? 0 : spacing * (count - 1));
@@ -563,11 +596,12 @@ export default class MiniGame1Scene extends Phaser.Scene {
       }
 
       if (this.mainMenuButton) {
-        const mx = Math.round(width - 90);
+        const mx = Math.round(width - (compact ? 72 : 90));
         const my = 34;
         try {
+          this.mainMenuButton.rect.setDisplaySize(compact ? 132 : 164, compact ? 42 : 46);
           this.mainMenuButton.rect.setPosition(mx, my);
-          this.mainMenuButton.txt.setPosition(mx, my);
+          this.mainMenuButton.txt.setPosition(mx, my).setFontSize(compact ? 13 : 15);
         } catch (e) {}
       }
     } catch (err) {

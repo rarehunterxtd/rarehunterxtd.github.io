@@ -277,8 +277,7 @@ export default class MainMenuScene extends Phaser.Scene {
       fill: UI_COLORS.paper,
       stroke: 0xb8d8c6,
       radius: 28,
-      shadowAlpha: 0.28,
-      shadowY: 10
+      shadow: false
     });
     const badge = this.add.text(0, -86, '★', {
       fontSize: '44px',
@@ -294,7 +293,7 @@ export default class MainMenuScene extends Phaser.Scene {
     const body = this.add.text(
       0,
       34,
-      'Tüm doğal gaz güvenliği oyunlarını tamamladın.\nArtık istediğin oyunu yeniden oynayabilirsin.',
+      'Tüm doğal gaz güvenliği oyunlarını tamamladın.\nİstediğin oyunu yeniden oynayabilirsin.',
       {
         fontSize: '18px',
         color: '#49657d',
@@ -359,17 +358,31 @@ export default class MainMenuScene extends Phaser.Scene {
       ease: 'Back.easeOut'
     });
 
-    this.celebration = { overlay, panel, panelBg, body, button, confetti };
+    this.celebration = { overlay, panel, panelBg, badge, title, body, button, confetti };
+    this._positionCelebration(width, height);
   }
 
   _positionCelebration(width, height) {
     if (!this.celebration) return;
-    const { overlay, panel, panelBg, body, button, confetti } = this.celebration;
+    const { overlay, panel, panelBg, badge, title, body, button, confetti } = this.celebration;
+    const compact = width < 620;
+    const panelHeight = compact ? 240 : 286;
     overlay.setDisplaySize(width, height).setPosition(0, 0);
     panel.setPosition(width / 2, height / 2);
-    panelBg.resizePanel(Math.min(520, width - 40), 286);
-    body.setWordWrapWidth(Math.min(410, width - 84));
-    button.bg.setPosition(width / 2, height / 2 + 96);
+    panelBg.resizePanel(Math.min(520, width - (compact ? 36 : 40)), panelHeight);
+    badge.setPosition(0, compact ? -72 : -86).setFontSize(compact ? 34 : 44);
+    title.setPosition(0, compact ? -31 : -28).setFontSize(compact ? 27 : 34);
+    body
+      .setPosition(0, compact ? 20 : 34)
+      .setFontSize(compact ? 14 : 18)
+      .setLineSpacing(compact ? 3 : 6)
+      .setWordWrapWidth(Math.min(compact ? 285 : 410, width - (compact ? 78 : 84)));
+    button.bg
+      .setDisplaySize(compact ? 240 : 232, compact ? 46 : 54)
+      .setPosition(width / 2, height / 2 + (compact ? 82 : 96));
+    button.text
+      .setPosition(width / 2, height / 2 + (compact ? 82 : 96))
+      .setFontSize(compact ? 15 : 17);
     confetti.forEach(({ dot, angle, distance }) => {
       dot.setPosition(
         width / 2 + Math.cos(angle) * distance,

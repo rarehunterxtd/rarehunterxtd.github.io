@@ -111,16 +111,11 @@ export default class MiniGame3Scene extends Phaser.Scene {
   _createCard(option, index) {
     const panel = createPanel(this, 0, 0, 160, 176, {
       fill: UI_COLORS.paper,
+      fillAlpha: 1,
       stroke: 0xf0c4ba,
       radius: 18,
-      shadowAlpha: 0.16,
-      shadowY: 6
+      shadow: false
     });
-    const badge = this.add.text(0, 0, String(index + 1).padStart(2, '0'), {
-      fontSize: '13px',
-      color: '#b94f3c',
-      fontStyle: 'bold'
-    }).setOrigin(0.5);
     const icon = this.add.image(0, 0, `${ICON_KEY_PREFIX}${option.icon}`).setOrigin(0.5);
     const label = this.add.text(0, 0, option.label, {
       fontSize: '16px',
@@ -131,13 +126,12 @@ export default class MiniGame3Scene extends Phaser.Scene {
     }).setOrigin(0.5);
     const hitZone = this.add.zone(0, 0, 150, 166).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
-    const card = this.add.container(0, 0, [panel, badge, icon, label, hitZone]).setDepth(20 + index);
+    const card = this.add.container(0, 0, [panel, icon, label, hitZone]).setDepth(20 + index);
     card.setDataEnabled();
     card.setData({
       id: option.id,
       option,
       panel,
-      badge,
       icon,
       label,
       hitZone,
@@ -355,10 +349,11 @@ export default class MiniGame3Scene extends Phaser.Scene {
       card.setData('optionIndex', index);
       card.setSize(cardWidth, cardHeight);
       card.getData('panel').resizePanel(cardWidth, cardHeight);
-      card.getData('badge').setPosition(-cardWidth / 2 + 22, -cardHeight / 2 + 19);
-      const iconSize = Math.round(Math.min(58, cardWidth * 0.34));
+      const iconSize = Math.round(compact
+        ? Math.min(58, cardWidth * 0.34)
+        : Math.min(82, cardWidth * 0.44));
       card.getData('icon')
-        .setPosition(0, -cardHeight * 0.13)
+        .setPosition(0, -cardHeight * (compact ? 0.13 : 0.11))
         .setDisplaySize(iconSize, iconSize);
       card.getData('label')
         .setPosition(0, cardHeight * 0.3)
