@@ -51,12 +51,12 @@ export default class MiniGame3Scene extends Phaser.Scene {
       fontSize: '14px',
       color: '#b94f3c',
       fontStyle: 'bold'
-    });
+    }).setDepth(60);
 
     this.instructionText = this.add.text(
       width / 2,
       88,
-      'Mutfakta doğal gaz kokusu aldın!\nGüvenli adımları doğru sırayla yerleştir.',
+      'Mutfakta doğal gaz kokusu aldın!\nGüvenli adımları sırayla yerleştir.',
       {
         fontSize: '24px',
         color: '#17324d',
@@ -65,7 +65,7 @@ export default class MiniGame3Scene extends Phaser.Scene {
         lineSpacing: 7,
         wordWrap: { width: Math.max(240, width - 48) }
       }
-    ).setOrigin(0.5, 0);
+    ).setOrigin(0.5, 0).setDepth(60);
 
     const menuButton = createButton(this, {
       x: width - 92,
@@ -330,7 +330,13 @@ export default class MiniGame3Scene extends Phaser.Scene {
     const gapY = compact ? 14 : 0;
     const totalCardsWidth = columns * cardWidth + (columns - 1) * gapX;
     const startX = width / 2 - totalCardsWidth / 2 + cardWidth / 2;
-    const cardsCenterY = compact ? Math.max(252, height * 0.37) : height * 0.37;
+    const mobileCardsTop = Math.max(
+      148,
+      Math.round((this.instructionText?.y || 70) + (this.instructionText?.height || 58) + 14)
+    );
+    const cardsCenterY = compact
+      ? mobileCardsTop + (rows * cardHeight + (rows - 1) * gapY) / 2
+      : height * 0.37;
     const startY = cardsCenterY - ((rows - 1) * (cardHeight + gapY)) / 2;
 
     this.cards.forEach((card, index) => {
@@ -368,7 +374,9 @@ export default class MiniGame3Scene extends Phaser.Scene {
     const totalSlotsWidth = slotColumns * slotWidth + (slotColumns - 1) * slotGapX;
     const slotStartX = width / 2 - totalSlotsWidth / 2 + slotWidth / 2;
     const cardsBottom = startY + (rows - 1) * (cardHeight + gapY) + cardHeight / 2;
-    const slotsCenterY = compact ? Math.max(cardsBottom + 100, height * 0.72) : height * 0.7;
+    const slotsCenterY = compact
+      ? cardsBottom + 30 + (slotRows * slotHeight + (slotRows - 1) * slotGapY) / 2
+      : height * 0.7;
     const slotStartY = slotsCenterY - ((slotRows - 1) * (slotHeight + slotGapY)) / 2;
 
     this.slots.forEach((slot, index) => {
@@ -461,11 +469,22 @@ export default class MiniGame3Scene extends Phaser.Scene {
   }
 
   _onResize(width, height) {
+    const compact = width < 620;
     this.backdrop?.resize(width, height);
-    this.mainMenuButton?.bg.setPosition(width - 92, 34);
+    this.eyebrowText
+      ?.setPosition(compact ? 14 : 20, compact ? 16 : 18)
+      .setFontSize(compact ? 11 : 14);
+    this.mainMenuButton?.bg
+      .setDisplaySize(compact ? 132 : 164, compact ? 42 : 46)
+      .setPosition(width - (compact ? 72 : 92), 34);
+    this.mainMenuButton?.text
+      .setPosition(width - (compact ? 72 : 92), 34)
+      .setFontSize(compact ? 13 : 15);
     this.instructionText
-      ?.setPosition(width / 2, width < 620 ? 72 : 88)
-      .setWordWrapWidth(Math.max(240, width - 48));
+      ?.setPosition(width / 2, compact ? 70 : 88)
+      .setFontSize(compact ? 17 : 24)
+      .setLineSpacing(compact ? 2 : 7)
+      .setWordWrapWidth(Math.max(220, width - (compact ? 28 : 48)));
     this.feedbackText
       ?.setPosition(width / 2, height - 56)
       .setWordWrapWidth(Math.max(220, width - 48));

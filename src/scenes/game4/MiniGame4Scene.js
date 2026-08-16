@@ -47,12 +47,14 @@ export default class MiniGame4Scene extends Phaser.Scene {
 
     this.backdrop = addBackdrop(this, { color: 0xeaf6f5, accent: UI_COLORS.teal, secondary: UI_COLORS.amber, depth: -200 });
     this.bgFill = this.add.rectangle(0, 0, width, height, 0xeaf6f5, 0.35).setOrigin(0).setDepth(-100);
-    this.add.text(20, 18, 'OYUN 04  •  TEMİZ HAVA', { fontSize: '14px', color: '#147565', fontStyle: 'bold' }).setDepth(50);
+    this.eyebrowText = this.add.text(20, 18, 'OYUN 04  •  TEMİZ HAVA', { fontSize: '14px', color: '#147565', fontStyle: 'bold' }).setDepth(50);
     this.instructionText = this.add.text(width / 2, 54, 'Engelleri sürükleyip menfezlerden uzaklaştır.', {
       fontSize: '20px',
       color: '#17324d',
-      fontStyle: 'bold'
-    }).setOrigin(0.5).setDepth(50);
+      fontStyle: 'bold',
+      align: 'center',
+      wordWrap: { width: Math.max(240, width - 40) }
+    }).setOrigin(0.5, 0).setDepth(50);
 
     const menuButton = createButton(this, {
       x: width - 92, y: 34, width: 164, height: 46, label: '←  Ana Menü',
@@ -243,18 +245,39 @@ export default class MiniGame4Scene extends Phaser.Scene {
   }
 
   _onResize(width, height) {
+    const compact = width < 620;
     this.backdrop?.resize(width, height);
     if (this.bgFill) {
       this.bgFill.setDisplaySize(width, height);
       this.bgFill.setPosition(0, 0);
     }
 
-    if (this.instructionText) {
-      this.instructionText.setPosition(Math.round(width / 2), 54);
-    }
+    this.eyebrowText
+      ?.setPosition(compact ? 14 : 20, compact ? 16 : 18)
+      .setFontSize(compact ? 11 : 14);
+
+    this.instructionText
+      ?.setPosition(Math.round(width / 2), compact ? 72 : 54)
+      .setFontSize(compact ? 16 : 20)
+      .setWordWrapWidth(Math.max(220, width - (compact ? 28 : 40)));
+
+    const topVentY = compact ? Math.max(178, Math.round(height * 0.24)) : null;
+    const bottomVentY = compact ? Math.min(height - 126, Math.round(height * 0.72)) : null;
+    const ventPositions = compact
+      ? [
+          { x: Math.round(width * 0.28), y: topVentY },
+          { x: Math.round(width * 0.72), y: topVentY },
+          { x: Math.round(width * 0.28), y: bottomVentY },
+          { x: Math.round(width * 0.72), y: bottomVentY }
+        ]
+      : VENT_LAYOUT.map((pos) => ({ x: Math.round(width * pos.x), y: Math.round(height * pos.y) }));
+
+    const contentCenterY = compact
+      ? Math.round((topVentY + bottomVentY) / 2)
+      : Math.round(height / 2);
 
     if (this.gazo) {
-      this.gazo.setPosition(Math.round(width / 2), Math.round(height / 2));
+      this.gazo.setPosition(Math.round(width / 2), contentCenterY);
       const targetHeight = Math.round(Math.min(width, height) * 0.34);
       const sourceImage = this.gazo.texture?.getSourceImage?.();
       const sourceW = sourceImage?.width || this.gazo.width || 1;
@@ -263,7 +286,7 @@ export default class MiniGame4Scene extends Phaser.Scene {
       const targetWidth = Math.round(targetHeight * aspect);
 
       this.gazo.setDisplaySize(targetWidth, targetHeight);
-      this.gazoFrame?.setPosition(Math.round(width / 2), Math.round(height / 2));
+      this.gazoFrame?.setPosition(Math.round(width / 2), contentCenterY);
       this.gazoFrame?.resizePanel(targetWidth + 32, targetHeight + 32);
     }
 
@@ -271,9 +294,7 @@ export default class MiniGame4Scene extends Phaser.Scene {
     const obstacleSize = Math.round(ventSize * 0.95);
 
     this.vents.forEach((vent, index) => {
-      const pos = VENT_LAYOUT[index];
-      const ventX = Math.round(width * pos.x);
-      const ventY = Math.round(height * pos.y);
+      const { x: ventX, y: ventY } = ventPositions[index];
       vent.setPosition(ventX, ventY);
       vent.setDisplaySize(ventSize, ventSize);
       this.ventFrames[index]?.setPosition(ventX, ventY);
@@ -282,9 +303,7 @@ export default class MiniGame4Scene extends Phaser.Scene {
 
     this.obstacles.forEach((obstacle, index) => {
       if (!obstacle || obstacle.getData('removed')) return;
-      const pos = VENT_LAYOUT[index];
-      const ventX = Math.round(width * pos.x);
-      const ventY = Math.round(height * pos.y);
+      const { x: ventX, y: ventY } = ventPositions[index];
       obstacle.setPosition(ventX, ventY);
       obstacle.setDisplaySize(obstacleSize, obstacleSize);
       obstacle.setData('homeX', ventX);
@@ -303,10 +322,11 @@ export default class MiniGame4Scene extends Phaser.Scene {
     this.menuButtonText?.setPosition(width / 2, height / 2 + 68);
 
     if (this.mainMenuButton) {
-      const mx = Math.round(width - 90);
+      const mx = Math.round(width - (compact ? 72 : 90));
       const my = 34;
+      this.mainMenuButton.rect.setDisplaySize(compact ? 132 : 164, compact ? 42 : 46);
       this.mainMenuButton.rect.setPosition(mx, my);
-      this.mainMenuButton.txt.setPosition(mx, my);
+      this.mainMenuButton.txt.setPosition(mx, my).setFontSize(compact ? 13 : 15);
     }
   }
 }

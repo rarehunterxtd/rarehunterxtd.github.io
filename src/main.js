@@ -14,6 +14,7 @@ const DEFAULT_TEXT_STYLE = {
 
 // Metin dokularını yüksek DPI ekranlarda keskin tutar. Oyun canvas'ının ve
 // sahne koordinatlarının aynı ölçekte kalması responsive yerleşimi korur.
+const getRenderScale = () => Phaser.Math.Clamp(window.devicePixelRatio || 1, 1, 2.5);
 const getTextResolution = () => Phaser.Math.Clamp(window.devicePixelRatio || 1, 1, 2);
 
 if (!Phaser.GameObjects.GameObjectFactory.prototype.__gazmerTextPatched) {
@@ -88,6 +89,9 @@ window.game = game;
 
 let refreshFrame = 0;
 let lastTextResolution = getTextResolution();
+let lastViewportWidth = 0;
+let lastViewportHeight = 0;
+let lastRenderScale = 0;
 
 const refreshTextResolution = () => {
   const nextResolution = getTextResolution();
@@ -103,6 +107,60 @@ const refreshTextResolution = () => {
   });
 };
 
+const syncHighDpiRenderer = (width, height) => {
+  const renderScale = getRenderScale();
+  const renderWidth = Math.max(1, Math.round(width * renderScale));
+  const renderHeight = Math.max(1, Math.round(height * renderScale));
+
+  // Phaser'ın sahne ölçülerini CSS pikselinde bırakırken WebGL çizim
+  // yüzeyini cihaz piksel yoğunluğunda oluştur. Böylece bütün yerleşim ve
+  // dokunma koordinatları değişmeden metinler, şekiller ve görseller keskinleşir.
+  game.canvas.width = renderWidth;
+  game.canvas.height = renderHeight;
+  game.canvas.style.width = `${width}px`;
+  game.canvas.style.height = `${height}px`;
+  game.renderer.resize(renderWidth, renderHeight);
+
+  game.scale.baseSize.setSize(renderWidth, renderHeight);
+  game.scale.displaySize.setSize(width, height);
+  game.scale.updateBounds();
+  game.scale.displayScale.set(
+    renderWidth / Math.max(1, game.scale.canvasBounds.width),
+    renderHeight / Math.max(1, game.scale.canvasBounds.height)
+  );
+
+  game.scene.getScenes(true).forEach((scene) => {
+    scene.cameras?.cameras.forEach((camera) => {
+      camera.setViewport(0, 0, renderWidth, renderHeight);
+      camera.setOrigin(0, 0);
+      camera.setZoom(renderScale);
+    });
+  });
+
+  lastViewportWidth = width;
+  lastViewportHeight = height;
+  lastRenderScale = renderScale;
+};
+
+// Yeni açılan sahnenin kamerasını da ilk çizimden önce yüksek DPI yüzeyine
+// eşitle. Boyut değişmediyse yalnızca yeni kamera güncellenmiş olur.
+game.events.on(Phaser.Core.Events.PRE_RENDER, () => {
+  if (!lastViewportWidth || !lastViewportHeight) return;
+  const renderScale = getRenderScale();
+  const renderWidth = Math.max(1, Math.round(lastViewportWidth * renderScale));
+  const renderHeight = Math.max(1, Math.round(lastViewportHeight * renderScale));
+
+  game.scene.getScenes(true).forEach((scene) => {
+    scene.cameras?.cameras.forEach((camera) => {
+      if (camera.width !== renderWidth || camera.height !== renderHeight) {
+        camera.setViewport(0, 0, renderWidth, renderHeight);
+      }
+      if (camera.originX !== 0 || camera.originY !== 0) camera.setOrigin(0, 0);
+      if (camera.zoom !== renderScale) camera.setZoom(renderScale);
+    });
+  });
+});
+
 // Pencere, yön, tarayıcı tam ekranı ve parent ölçüsü değişikliklerini tek
 // animasyon karesinde birleştirir. Ölçüyü DOM'dan okuyup Phaser canvas'ına
 // doğrudan uygulamak, bazı mobil/4K tarayıcılarda görülen yarım ekran ve
@@ -113,13 +171,14 @@ const queueScaleRefresh = () => {
     if (!game.scale?.canvas) return;
 
     const { width, height } = readViewportSize();
-    const sizeChanged = game.scale.width !== width
-      || game.scale.height !== height
-      || game.canvas.width !== width
-      || game.canvas.height !== height;
+    const renderScale = getRenderScale();
+    const sizeChanged = lastViewportWidth !== width
+      || lastViewportHeight !== height
+      || lastRenderScale !== renderScale;
 
     if (sizeChanged) {
       game.scale.resize(width, height);
+      syncHighDpiRenderer(width, height);
     } else {
       game.scale.updateBounds();
     }

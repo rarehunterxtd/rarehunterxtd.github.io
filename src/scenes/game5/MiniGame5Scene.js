@@ -286,13 +286,15 @@ export default class MiniGame5Scene extends Phaser.Scene {
       this.feedbackText.setFontSize(compact ? 16 : 18);
     }
 
-    const meterWidth = Math.round(Math.min(width * (compact ? 0.88 : 0.56), height * 1.05) * 0.6);
+    const meterWidth = Math.round(compact
+      ? width * 0.468
+      : Math.min(width * 0.34, height * 0.36));
     const meterHeight = Math.round(meterWidth * (349 / 667));
     const needleHeight = Math.round(meterHeight * 0.72);
     const boilerWidth = Math.round(meterWidth * 1.55);
     const valveWidth = Math.round(meterWidth * 0.34);
     const centerX = Math.round(width / 2);
-    const centerY = Math.round(height * (compact ? 0.47 : 0.52));
+    const centerY = Math.round(height * (compact ? 0.44 : 0.52));
 
     if (this.boiler) {
       const source = this.boiler.texture.getSourceImage();
@@ -336,16 +338,16 @@ export default class MiniGame5Scene extends Phaser.Scene {
 
     if (this.leftButton) {
       const x = centerX - Math.round(meterWidth * 0.7);
-      this.leftButton.bg.setDisplaySize(compact ? 72 : 88, compact ? 72 : 88);
+      this.leftButton.bg.setDisplaySize(compact ? 62 : 88, compact ? 62 : 88);
       this.leftButton.bg.setPosition(x, centerY);
-      this.leftButton.text.setPosition(x, centerY);
+      this.leftButton.text.setPosition(x, centerY).setFontSize(compact ? 31 : 38);
     }
 
     if (this.rightButton) {
       const x = centerX + Math.round(meterWidth * 0.7);
-      this.rightButton.bg.setDisplaySize(compact ? 72 : 88, compact ? 72 : 88);
+      this.rightButton.bg.setDisplaySize(compact ? 62 : 88, compact ? 62 : 88);
       this.rightButton.bg.setPosition(x, centerY);
-      this.rightButton.text.setPosition(x, centerY);
+      this.rightButton.text.setPosition(x, centerY).setFontSize(compact ? 31 : 38);
     }
 
     if (this.overlay) {
@@ -372,7 +374,7 @@ export default class MiniGame5Scene extends Phaser.Scene {
       const my = 34;
       this.mainMenuButton.rect.setDisplaySize(compact ? 132 : 164, compact ? 42 : 46);
       this.mainMenuButton.rect.setPosition(mx, my);
-      this.mainMenuButton.txt.setPosition(mx, my);
+      this.mainMenuButton.txt.setPosition(mx, my).setFontSize(compact ? 13 : 15);
     }
     this.titleText?.setVisible(!compact);
   }
