@@ -7,7 +7,6 @@ import MiniGame1Scene from './scenes/game1/MiniGame1Scene.js';
 import MiniGame3Scene from './scenes/game3/MiniGame3Scene.js';
 import MiniGame4Scene from './scenes/game4/MiniGame4Scene.js';
 import MiniGame5Scene from './scenes/game5/MiniGame5Scene.js';
-import MiniGame6Scene from './scenes/game6/MiniGame6Scene.js';
 
 const DEFAULT_TEXT_STYLE = {
   fontFamily: 'Trebuchet MS, sans-serif'
@@ -42,8 +41,7 @@ const config = {
     MiniGame1Scene,
     MiniGame3Scene,
     MiniGame4Scene,
-    MiniGame5Scene,
-    MiniGame6Scene
+    MiniGame5Scene
   ]
 };
 

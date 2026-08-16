@@ -6,8 +6,7 @@ const GAME_CARDS = [
   { key: 'game2', scene: 'MiniGame2', number: '02', title: 'Tehlikeyi Bul', subtitle: 'Riskleri fark et', color: 0x1f9d8b, icon: 'search' },
   { key: 'game3', scene: 'MiniGame3', number: '03', title: 'Gaz Kaçağı', subtitle: 'Adımları sırala', color: 0xe97862, icon: 'steps' },
   { key: 'game4', scene: 'MiniGame4', number: '04', title: 'GAZO ve Menfezler', subtitle: 'Hava yolunu aç', color: 0xf2b84b, icon: 'vent' },
-  { key: 'game5', scene: 'MiniGame5', number: '05', title: 'Basınç Ustası', subtitle: 'İbreyi dengede tut', color: 0x7768b5, icon: 'gauge' },
-  { key: 'game6', scene: 'MiniGame6', number: '06', title: 'Hangisi Yetkili?', subtitle: 'Bilgini test et', color: 0x49a66f, icon: 'badge' }
+  { key: 'game5', scene: 'MiniGame5', number: '05', title: 'Basınç Ustası', subtitle: 'İbreyi dengede tut', color: 0x7768b5, icon: 'gauge' }
 ];
 
 export default class MainMenuScene extends Phaser.Scene {
@@ -195,11 +194,17 @@ export default class MainMenuScene extends Phaser.Scene {
     const gridHeight = cardHeight * rows + gapY * (rows - 1);
     const startX = width / 2 - gridWidth / 2 + cardWidth / 2;
     const startY = gridTop + Math.max(0, (availableHeight - gridHeight) / 2) + cardHeight / 2;
+    const remainder = this.cards.length % cols;
+    const lastRowCount = remainder === 0 ? cols : remainder;
 
     this.cards.forEach((card, index) => {
       const col = index % cols;
       const row = Math.floor(index / cols);
-      card.state.x = startX + col * (cardWidth + gapX);
+      const isLastRow = row === rows - 1;
+      const rowCount = isLastRow ? lastRowCount : cols;
+      const rowWidth = cardWidth * rowCount + gapX * (rowCount - 1);
+      const rowStartX = width / 2 - rowWidth / 2 + cardWidth / 2;
+      card.state.x = rowStartX + col * (cardWidth + gapX);
       card.state.y = startY + row * (cardHeight + gapY);
       card.state.width = cardWidth;
       card.state.height = cardHeight;
@@ -239,7 +244,7 @@ export default class MainMenuScene extends Phaser.Scene {
     const body = this.add.text(
       0,
       34,
-      'Altı doğal gaz güvenliği oyununu da tamamladın.\nArtık istediğin oyunu yeniden oynayabilirsin.',
+      'Tüm doğal gaz güvenliği oyunlarını tamamladın.\nArtık istediğin oyunu yeniden oynayabilirsin.',
       {
         fontSize: '18px',
         color: '#49657d',
