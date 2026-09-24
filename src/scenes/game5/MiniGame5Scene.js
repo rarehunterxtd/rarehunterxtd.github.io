@@ -17,6 +17,7 @@ export default class MiniGame5Scene extends Phaser.Scene {
     super('MiniGame5');
     this.valve = null;
     this.pressureMeter = null;
+    this.screen = null;
     this.needle = null;
     this.safeMinNeedle = null;
     this.safeMaxNeedle = null;
@@ -54,6 +55,9 @@ export default class MiniGame5Scene extends Phaser.Scene {
     this.load.image('game5_valve', assetUrl('vana.png'));
     this.load.image('game5_pressure_meter', assetUrl('pressure_meter.png'));
     this.load.image('game5_needle', assetUrl('ibre.png'));
+    this.load.image('game5_screen_off', assetUrl('screen_off.png'));
+    this.load.image('game5_screen_true', assetUrl('screen_true.png'));
+    this.load.image('game5_screen_wrong', assetUrl('screen_wrong.png'));
   }
 
   create() {
@@ -94,6 +98,7 @@ export default class MiniGame5Scene extends Phaser.Scene {
 
     this.valve = this.add.image(width / 2, height / 2 + 140, 'game5_valve').setOrigin(0.5).setDepth(12);
     this.pressureMeter = this.add.image(width / 2, height / 2, 'game5_pressure_meter').setOrigin(0.5).setDepth(10);
+    this.screen = this.add.image(width / 2, height / 2, 'game5_screen_off').setOrigin(0.5).setDepth(11);
     this.needle = this.add.image(width / 2, height / 2, 'game5_needle').setOrigin(0.5, 1).setDepth(20);
     if (showSafeAngles) {
       this.safeMinNeedle = this.add.image(width / 2, height / 2, 'game5_needle').setOrigin(0.5, 1).setDepth(19).setAlpha(0.45);
@@ -216,6 +221,11 @@ export default class MiniGame5Scene extends Phaser.Scene {
   _syncNeedle() {
     if (!this.needle) return;
     this.needle.setAngle(this.currentAngle);
+    if (this.screen) {
+      this.screen.setTexture(this.currentAngle >= SAFE_MIN && this.currentAngle <= SAFE_MAX
+        ? 'game5_screen_true'
+        : 'game5_screen_wrong');
+    }
   }
 
   update(time, delta) {
@@ -351,6 +361,13 @@ export default class MiniGame5Scene extends Phaser.Scene {
     if (this.pressureMeter) {
       this.pressureMeter.setPosition(centerX, centerY);
       this.pressureMeter.setDisplaySize(meterWidth, meterHeight);
+    }
+
+    if (this.screen) {
+      const screenWidth = Math.round(meterWidth * 0.24);
+      const screenHeight = Math.round(screenWidth * (187 / 307));
+      this.screen.setPosition(centerX, centerY - Math.round(meterHeight * 0.66));
+      this.screen.setDisplaySize(screenWidth, screenHeight);
     }
 
     if (this.needle) {
