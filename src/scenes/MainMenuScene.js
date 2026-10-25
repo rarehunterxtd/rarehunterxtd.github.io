@@ -26,6 +26,7 @@ export default class MainMenuScene extends Phaser.Scene {
   }
 
   preload() {
+    this.load.audio('all_games_win_sound', `${import.meta.env.BASE_URL}assets/common/win_sound.mp3`);
     if (!this.textures.exists('game3_main_icon')) {
       this.load.image('game3_main_icon', `${import.meta.env.BASE_URL}assets/game3/icon.png`);
     }
@@ -63,6 +64,7 @@ export default class MainMenuScene extends Phaser.Scene {
     const allGamesCompleted = GAME_CARDS.every((game) => Boolean(completedGames[game.key]));
     if (allGamesCompleted && !this.registry.get(this.allGamesCelebratedKey)) {
       this.registry.set(this.allGamesCelebratedKey, true);
+      this.sound.play('all_games_win_sound');
       this._showAllGamesCelebration();
     }
     this._resizeHandler = (gameSize) => this._positionMenu(gameSize.width, gameSize.height);

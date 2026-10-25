@@ -1,22 +1,23 @@
 import Phaser from 'phaser';
-import { addBackdrop, createButton, createPanel, pulseSuccess, shakeSoft, UI_COLORS } from '../../ui/gameUi.js';
+import { addBackdrop, createButton, createIntroModal, createPanel, pulseSuccess, shakeSoft, UI_COLORS } from '../../ui/gameUi.js';
 
 const assetUrl = (file) => `${import.meta.env.BASE_URL}assets/game5/${file}`;
 
 const SAFE_MIN = -31;
 const SAFE_MAX = 32;
 const showSafeAngles = false;
-const TIMER_SECONDS = 30;
+const TIMER_SECONDS = 20;
 const NEEDLE_MIN = -90;
 const NEEDLE_MAX = 90;
 const REQUIRED_SAFE_SECONDS = 20;
-const REQUIRED_INPUTS = 4;
+const REQUIRED_INPUTS = 2;
 
 export default class MiniGame5Scene extends Phaser.Scene {
   constructor() {
     super('MiniGame5');
     this.valve = null;
     this.pressureMeter = null;
+    this.screen = null;
     this.needle = null;
     this.safeMinNeedle = null;
     this.safeMaxNeedle = null;
@@ -44,12 +45,19 @@ export default class MiniGame5Scene extends Phaser.Scene {
     this.transitioning = false;
     this.cursors = null;
     this.mainMenuButton = null;
+    this.introModal = null;
+    this.started = false;
   }
 
   preload() {
+    this.load.audio('game5_correct_answer', assetUrl('correct_answer.mp3'));
+    this.load.audio('game5_wrong_answer', assetUrl('wrong_answer.mp3'));
     this.load.image('game5_valve', assetUrl('vana.png'));
     this.load.image('game5_pressure_meter', assetUrl('pressure_meter.png'));
     this.load.image('game5_needle', assetUrl('ibre.png'));
+    this.load.image('game5_screen_off', assetUrl('screen_off.png'));
+    this.load.image('game5_screen_true', assetUrl('screen_true.png'));
+    this.load.image('game5_screen_wrong', assetUrl('screen_wrong.png'));
   }
 
   create() {
@@ -65,6 +73,8 @@ export default class MiniGame5Scene extends Phaser.Scene {
     this.inputCooldown = 0;
     this.resultAction = 'restart';
     this.transitioning = false;
+    this.started = false;
+    this.introModal = null;
 
     this.backdrop = addBackdrop(this, { color: 0xf3f0fb, accent: UI_COLORS.lavender, secondary: UI_COLORS.teal, depth: -200 });
     this.bgFill = this.add.rectangle(0, 0, width, height, 0xf3f0fb, 0.3).setOrigin(0).setDepth(-100);
@@ -88,6 +98,7 @@ export default class MiniGame5Scene extends Phaser.Scene {
 
     this.valve = this.add.image(width / 2, height / 2 + 140, 'game5_valve').setOrigin(0.5).setDepth(12);
     this.pressureMeter = this.add.image(width / 2, height / 2, 'game5_pressure_meter').setOrigin(0.5).setDepth(10);
+    this.screen = this.add.image(width / 2, height / 2, 'game5_screen_off').setOrigin(0.5).setDepth(11);
     this.needle = this.add.image(width / 2, height / 2, 'game5_needle').setOrigin(0.5, 1).setDepth(20);
     if (showSafeAngles) {
       this.safeMinNeedle = this.add.image(width / 2, height / 2, 'game5_needle').setOrigin(0.5, 1).setDepth(19).setAlpha(0.45);
@@ -105,27 +116,27 @@ export default class MiniGame5Scene extends Phaser.Scene {
     this.cursors = this.input.keyboard.createCursorKeys();
     this.lastDisplayedSecond = TIMER_SECONDS;
 
-    this.overlay = this.add.rectangle(0, 0, width, height, 0x000000, 0.68)
+    this.overlay = this.add.rectangle(0, 0, width, height, 0x102a3d, 0.72)
       .setOrigin(0)
       .setDepth(1000)
       .setVisible(false)
       .setInteractive();
 
     this.panel = this.add.container(width / 2, height / 2).setDepth(1001).setVisible(false);
-    const panelBg = createPanel(this, 0, 0, Math.min(440, width - 40), 250, {
-      fill: UI_COLORS.paper, stroke: 0xc9c0e8, radius: 24, shadow: false
+    const panelBg = createPanel(this, 0, 0, Math.min(460, width - 40), 230, {
+      fill: UI_COLORS.paper, stroke: 0xb8d8c6, radius: 24, shadowAlpha: 0.25
     });
-    this.panelTitle = this.add.text(0, -58, '', { fontSize: '30px', color: '#17324d', fontStyle: 'bold', align: 'center' }).setOrigin(0.5);
-    this.panelBody = this.add.text(0, -8, '', {
+    this.panelTitle = this.add.text(0, -54, '', { fontSize: '30px', color: '#2f7c50', fontStyle: 'bold', align: 'center' }).setOrigin(0.5);
+    this.panelBody = this.add.text(0, 0, '', {
       fontSize: '18px',
       color: '#49657d',
       align: 'center',
-      wordWrap: { width: Math.min(340, width - 80) }
+      wordWrap: { width: Math.min(380, width - 80) }
     }).setOrigin(0.5);
     this.panel.add([panelBg, this.panelTitle, this.panelBody]);
     const actionButton = createButton(this, {
-      x: width / 2, y: height / 2 + 78, width: 228, height: 54, label: '',
-      fill: UI_COLORS.lavender, stroke: 0xe7e0ff, depth: 1002
+      x: width / 2, y: height / 2 + 72, width: 228, height: 54, label: '',
+      fill: UI_COLORS.green, stroke: 0xd8f5e3, depth: 1002
     });
     actionButton.bg.setVisible(false);
     this.panelActionBg = actionButton.bg;
@@ -143,6 +154,15 @@ export default class MiniGame5Scene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this._onShutdown, this);
 
     this._onResize(width, height);
+
+    this.introModal = createIntroModal(this, {
+      title: 'Oyun 5 - Basınç Ustası',
+      body: 'Bu mini oyunda, basınç ibresini güvenli bölgede tutman gerekiyor. İbreyi 1 bar ile 2 bar arasında tutmak için yön tuşlarını kullanarak ibreyi dengele. Bu sırada süreye dikkat et!',
+      fill: UI_COLORS.lavender,
+      stroke: 0xe7e0ff,
+      onStart: () => { this.started = true; }
+    });
+    this.introModal.resize(width, height);
   }
 
   _createButton(x, y, label, handler) {
@@ -153,7 +173,7 @@ export default class MiniGame5Scene extends Phaser.Scene {
   }
 
   _nudgeNeedle(delta) {
-    if (this.isFinished) return;
+    if (this.isFinished || !this.started) return;
     this._animateValve(Math.sign(delta));
     this.inputCount += 1;
     this.angularVelocity += delta * 0.9;
@@ -201,10 +221,15 @@ export default class MiniGame5Scene extends Phaser.Scene {
   _syncNeedle() {
     if (!this.needle) return;
     this.needle.setAngle(this.currentAngle);
+    if (this.screen) {
+      this.screen.setTexture(this.currentAngle >= SAFE_MIN && this.currentAngle <= SAFE_MAX
+        ? 'game5_screen_true'
+        : 'game5_screen_wrong');
+    }
   }
 
   update(time, delta) {
-    if (this.isFinished) return;
+    if (this.isFinished || !this.started) return;
 
     // Büyük kare gecikmelerini sınırlamak, sekme geri geldiğinde fiziğin ve
     // sayacın bir anda sona atlayıp sahneyi kilitlenmiş gibi göstermesini önler.
@@ -247,17 +272,16 @@ export default class MiniGame5Scene extends Phaser.Scene {
     this.isFinished = true;
 
     const success = this.currentAngle >= SAFE_MIN
-      && this.currentAngle <= SAFE_MAX
-      && this.safeElapsed >= REQUIRED_SAFE_SECONDS
-      && this.inputCount >= REQUIRED_INPUTS;
+      && this.currentAngle <= SAFE_MAX;
+    this.sound.play(success ? 'game5_correct_answer' : 'game5_wrong_answer');
     if (success) {
       this._markGameCompleted();
-      this._showResult('Tebrikler!', 'Basınç ibresini güvenli aralıkta tuttun.', 'Ana Menüye Dön', 'menu');
+      this._showResult('✓  Tebrikler!', 'Basınç ibresini 1 bar ile 2 bar arasında tuttun.', 'Ana Menüye Dön', 'menu');
       pulseSuccess(this, [this.panel, this.panelActionBg.face]);
     } else {
       const body = this.inputCount < REQUIRED_INPUTS
         ? 'Basınç kendiliğinden değişir. Yön tuşlarıyla aktif olarak dengele.'
-        : 'İbreyi güvenli bölgede daha uzun süre tutmalısın.';
+        : 'İbreyi güvenli bölgede tutmalısın.';
       this._showResult('Tekrar dene', body, 'Yeniden Dene', 'restart');
       shakeSoft(this, this.panel);
     }
@@ -273,6 +297,8 @@ export default class MiniGame5Scene extends Phaser.Scene {
       this.scale.off('resize', this._resizeHandler);
       this._resizeHandler = null;
     }
+    this.introModal?.destroy();
+    this.introModal = null;
   }
 
   _showResult(title, body, actionLabel, action = 'restart') {
@@ -337,6 +363,13 @@ export default class MiniGame5Scene extends Phaser.Scene {
       this.pressureMeter.setDisplaySize(meterWidth, meterHeight);
     }
 
+    if (this.screen) {
+      const screenWidth = Math.round(meterWidth * 0.24);
+      const screenHeight = Math.round(screenWidth * (187 / 307));
+      this.screen.setPosition(centerX, centerY - Math.round(meterHeight * 0.66));
+      this.screen.setDisplaySize(screenWidth, screenHeight);
+    }
+
     if (this.needle) {
       this.needle.setPosition(centerX, centerY + Math.round(meterHeight * 0.32));
       this.needle.setDisplaySize(Math.max(12, Math.round(needleHeight * (37 / 244))), needleHeight);
@@ -390,8 +423,8 @@ export default class MiniGame5Scene extends Phaser.Scene {
         this.panelBody.setWordWrapWidth(Math.min(340, width - 80));
       }
     }
-    this.panelActionBg?.setPosition(centerX, centerY + 78);
-    this.panelActionText?.setPosition(centerX, centerY + 78);
+    this.panelActionBg?.setPosition(centerX, centerY + 72);
+    this.panelActionText?.setPosition(centerX, centerY + 72);
 
     if (this.mainMenuButton) {
       const mx = Math.round(width - (compact ? 72 : 90));
@@ -400,6 +433,7 @@ export default class MiniGame5Scene extends Phaser.Scene {
       this.mainMenuButton.rect.setPosition(mx, my);
       this.mainMenuButton.txt.setPosition(mx, my).setFontSize(compact ? 13 : 15);
     }
+    this.introModal?.resize(width, height);
     this.titleText?.setVisible(!compact);
   }
 }

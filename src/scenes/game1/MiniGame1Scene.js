@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { addBackdrop, createButton, createPanel, pulseSuccess, shakeSoft, UI_COLORS } from '../../ui/gameUi.js';
+import { addBackdrop, createButton, createIntroModal, createPanel, pulseSuccess, shakeSoft, UI_COLORS } from '../../ui/gameUi.js';
 
 const assetUrl = (file) => `${import.meta.env.BASE_URL}assets/game1/${file}`;
 
@@ -79,10 +79,18 @@ export default class MiniGame1Scene extends Phaser.Scene {
     this.scenarioText = null; // overlay descriptive text shown over media
     this.continueButton = null; // { rect, txt }
     this.mainMenuButton = null; // { rect, txt }
+    this.eyebrowText = null;
+    this.introModal = null;
+    this.completionOverlay = null;
+    this.completionPanel = null;
+    this.completionButton = null;
+    this.started = false;
   }
 
   preload() {
     // Tüm senaryolardaki gerekli assetleri yükle
+    this.load.audio('game1_correct_answer', assetUrl('correct_answer.mp3'));
+    this.load.audio('game1_wrong_answer', assetUrl('wrong_answer.mp3'));
     this.scenarios.forEach((s, i) => {
       if (s.hasVideo && s.videoPath) {
         this.load.video(`game1_video_${i}`, s.videoPath, 'loadeddata', false, true);
@@ -96,6 +104,8 @@ export default class MiniGame1Scene extends Phaser.Scene {
   create() {
     const { width, height } = this.scale;
     this.currentScenarioIndex = 0;
+    this.started = false;
+    this.introModal = null;
     this.backdrop = addBackdrop(this, { color: 0x102a3d, accent: UI_COLORS.blue, secondary: UI_COLORS.teal, depth: -220 });
     this.bgFill = this.add.rectangle(0, 0, width, height, 0x102a3d, 0.56).setOrigin(0).setDepth(-10);
     const mediaBounds = this._getMediaBounds(width, height);
@@ -114,6 +124,12 @@ export default class MiniGame1Scene extends Phaser.Scene {
     this.mediaMask = this.mediaMaskGraphics.createGeometryMask();
     this._updateMediaMask(mediaBounds);
 
+    this.eyebrowText = this.add.text(20, 18, 'OYUN 01  •  DOĞRU SEÇİMİ BUL', {
+      fontSize: '14px',
+      color: '#b8d7f5',
+      fontStyle: 'bold'
+    }).setDepth(60);
+
     const menuButton = createButton(this, {
       x: width - 92, y: 34, width: 164, height: 46, label: '←  Ana Menü',
       fill: UI_COLORS.navy, stroke: 0x8eb5c5, fontSize: 15, depth: 300,
@@ -130,9 +146,45 @@ export default class MiniGame1Scene extends Phaser.Scene {
       align: 'center', wordWrap: { width: Math.max(220, width - 48) }
     }).setOrigin(0.5).setVisible(false).setDepth(190);
 
+    this.completionOverlay = this.add.rectangle(0, 0, width, height, 0x102a3d, 0.72)
+      .setOrigin(0)
+      .setDepth(5000)
+      .setVisible(false)
+      .setInteractive();
+    this.completionPanel = this.add.container(width / 2, height / 2).setDepth(5001).setVisible(false);
+    const completionPanelBg = createPanel(this, 0, 0, Math.min(460, width - 40), 230, {
+      fill: UI_COLORS.paper, stroke: 0xb8d8c6, radius: 24, shadowAlpha: 0.25
+    });
+    const completionTitle = this.add.text(0, -54, '✓  Tebrikler!', {
+      fontSize: '30px', color: '#2f7c50', fontStyle: 'bold', align: 'center'
+    }).setOrigin(0.5);
+    const completionBody = this.add.text(0, 0, 'Tüm senaryoları başarıyla tamamladın.', {
+      fontSize: '18px', color: '#49657d', align: 'center',
+      wordWrap: { width: Math.min(380, width - 80) }
+    }).setOrigin(0.5);
+    this.completionPanel.add([completionPanelBg, completionTitle, completionBody]);
+    this.completionButton = createButton(this, {
+      x: width / 2, y: height / 2 + 72, width: 228, height: 54,
+      label: 'Ana Menüye Dön  ›', fill: UI_COLORS.green, stroke: 0xd8f5e3,
+      depth: 5002, onClick: () => {
+        this._markGameCompleted();
+        this.scene.start('MainMenu');
+      }
+    });
+    this.completionButton.bg.setVisible(false);
+
     // Seçenek butonlarını oluştur
     this._renderCurrentScenario();
     this._onResize(width, height);
+
+    this.introModal = createIntroModal(this, {
+      title: 'Oyun 1 - Doğru Seçimi Bul',
+      body: 'Bu mini oyunda, karşına çıkan duruma göre en doğru seçimi bulman gerekiyor. Her senaryoda bir görsel çıkacak ve sana üç seçenek sunulacak. Doğru seçimi yaparak ilerle ve tüm senaryoları tamamla!',
+      fill: UI_COLORS.blue,
+      stroke: 0xb8dfea,
+      onStart: () => this._startGame()
+    });
+    this.introModal.resize(width, height);
 
     // Resize handler
     this._resizeHandler = (gameSize) => {
@@ -177,6 +229,12 @@ export default class MiniGame1Scene extends Phaser.Scene {
     });
   }
 
+  _startGame() {
+    if (this.started) return;
+    this.started = true;
+    if (this.video) this.video.play(true);
+  }
+
   _fitTextToWidth(txt, maxWidth, minFont = 10) {
     // start from current or default size
     let size = 18;
@@ -197,8 +255,10 @@ export default class MiniGame1Scene extends Phaser.Scene {
   }
 
   _onOptionSelected(option, rect) {
+    if (!this.started) return;
     // Görsel geribildirim
     const correct = !!option.isCorrect;
+    this.sound.play(correct ? 'game1_correct_answer' : 'game1_wrong_answer');
     // Renk değişimi
     rect.setFillStyle(correct ? 0x388e3c : 0xd32f2f);
 
@@ -242,9 +302,10 @@ export default class MiniGame1Scene extends Phaser.Scene {
           }
       }
 
-      // feedback'i göster ve devam butonunu çıkar (son senaryo ise menü butonu göster)
+      // feedback'i göster ve devam butonunu çıkar (son senaryo ise bitiş popup'ını göster)
       const isLast = this.currentScenarioIndex === this.scenarios.length - 1;
-      this._showContinueButton(isLast);
+      if (isLast) this._showCompletionUI();
+      else this._showContinueButton(false);
     } else {
       // Yanlışsa, kısa gösterip normal duruma dön
       this.time.delayedCall(1600, () => {
@@ -302,7 +363,7 @@ export default class MiniGame1Scene extends Phaser.Scene {
       const mediaBounds = this._getMediaBounds(width, height);
       this.video = this.add.video(mediaBounds.x, mediaBounds.y, key).setOrigin(0.5).setDepth(-4);
       this.video.setMask(this.mediaMask);
-      this.video.play(true);
+      if (this.started) this.video.play(true);
       const adjustVideo = () => this._resizeVideo(this.scale.width, this.scale.height);
       if (this.video.getVideoWidth && this.video.getVideoWidth() > 0) adjustVideo();
       else {
@@ -517,6 +578,21 @@ export default class MiniGame1Scene extends Phaser.Scene {
     this.continueButton = { rect: button.bg, txt: button.text, isLast };
   }
 
+  _showCompletionUI() {
+    this._markGameCompleted();
+    this.completionOverlay?.setVisible(true);
+    this.completionPanel?.setVisible(true).setScale(0.92).setAlpha(0);
+    this.completionButton?.bg.setVisible(true);
+    this.tweens.add({
+      targets: this.completionPanel,
+      alpha: 1,
+      scale: 1,
+      duration: 230,
+      ease: 'Back.easeOut'
+    });
+    pulseSuccess(this, [this.completionButton?.bg.face].filter(Boolean));
+  }
+
   _destroyContinueButton() {
     if (!this.continueButton) return;
     try {
@@ -535,6 +611,8 @@ export default class MiniGame1Scene extends Phaser.Scene {
       this.scale.off('resize', this._resizeHandler);
       this._resizeHandler = null;
     }
+    this.introModal?.destroy();
+    this.introModal = null;
     this.mediaMaskGraphics?.destroy();
     this.mediaMaskGraphics = null;
     this.mediaMask = null;
@@ -552,6 +630,19 @@ export default class MiniGame1Scene extends Phaser.Scene {
       this.mediaFrame?.resizePanel(mediaBounds.width + 16, mediaBounds.height + 16);
 
       const compact = width < 620;
+
+      this.eyebrowText
+        ?.setPosition(compact ? 14 : 20, compact ? 16 : 18)
+        .setFontSize(compact ? 11 : 14);
+      this.introModal?.resize(width, height);
+
+      this.completionOverlay?.setDisplaySize(width, height).setPosition(0, 0);
+      this.completionPanel?.setPosition(width / 2, height / 2);
+      const completionPanelBg = this.completionPanel?.list?.[0];
+      completionPanelBg?.resizePanel?.(Math.min(460, width - 40), 230);
+      this.completionPanel?.list?.[2]?.setWordWrapWidth(Math.min(380, width - 80));
+      this.completionButton?.bg.setPosition(width / 2, height / 2 + 72);
+      this.completionButton?.text.setPosition(width / 2, height / 2 + 72);
 
       if (this.feedbackText) {
         this.feedbackText

@@ -100,6 +100,103 @@ export function createPanel(scene, x, y, width, height, options = {}) {
   return graphics;
 }
 
+export function createIntroModal(scene, {
+  title = 'Oyuna Hazır mısın?',
+  body = '',
+  fill = UI_COLORS.blue,
+  stroke = 0xb8dfea,
+  onStart
+} = {}) {
+  const width = scene.scale.width;
+  const height = scene.scale.height;
+  const overlay = scene.add.rectangle(0, 0, width, height, UI_COLORS.navy, 0.72)
+    .setOrigin(0)
+    .setDepth(2000)
+    .setInteractive();
+  const panel = scene.add.container(width / 2, height / 2).setDepth(2001);
+  const panelBg = createPanel(scene, 0, 0, Math.min(460, width - 40), 300, {
+    fill: UI_COLORS.paper,
+    stroke,
+    radius: 24,
+    shadowAlpha: 0.24
+  });
+  const modalTitle = scene.add.text(0, -54, title, {
+    fontSize: '28px',
+    color: '#17324d',
+    fontStyle: 'bold',
+    align: 'center',
+    wordWrap: { width: Math.min(380, width - 80) }
+  }).setOrigin(0.5);
+  const modalBody = scene.add.text(0, 0, body, {
+    fontSize: '17px',
+    color: '#49657d',
+    align: 'center',
+    wordWrap: { width: Math.min(370, width - 80) }
+  }).setOrigin(0.5).setVisible(Boolean(body));
+  panel.add([panelBg, modalTitle, modalBody]);
+
+  let started = false;
+  const startButton = createButton(scene, {
+    x: width / 2,
+    y: height / 2 + 102,
+    width: 190,
+    height: 54,
+    label: 'Başla  ›',
+    fill,
+    stroke,
+    depth: 2002,
+    onClick: () => {
+      if (started) return;
+      started = true;
+      overlay.setVisible(false);
+      panel.setVisible(false);
+      startButton.bg.setVisible(false);
+      onStart?.();
+    }
+  });
+
+  return {
+    overlay,
+    panel,
+    panelBg,
+    title: modalTitle,
+    body: modalBody,
+    button: startButton,
+    resize(nextWidth, nextHeight) {
+      const compact = nextWidth < 620;
+      const panelWidth = Math.min(460, nextWidth - 40);
+      const panelHeight = compact ? 280 : 300;
+      const centerX = Math.round(nextWidth / 2);
+      const centerY = Math.round(nextHeight / 2);
+      overlay.setDisplaySize(nextWidth, nextHeight).setPosition(0, 0);
+      panel.setPosition(centerX, centerY);
+      panelBg.resizePanel(panelWidth, panelHeight);
+      modalTitle
+        .setPosition(0, compact ? -88 : -92)
+        .setFontSize(compact ? 23 : 28)
+        .setWordWrapWidth(Math.min(380, nextWidth - 64));
+      modalBody
+        .setPosition(0, compact ? -10 : -8)
+        .setFontSize(compact ? 15 : 17)
+        .setWordWrapWidth(Math.min(370, nextWidth - 64));
+      startButton.bg
+        .setDisplaySize(compact ? 172 : 190, compact ? 50 : 54)
+        .setPosition(centerX, centerY + (compact ? 92 : 102));
+      startButton.text
+        .setPosition(centerX, centerY + (compact ? 92 : 102))
+        .setFontSize(compact ? 16 : 17);
+    },
+    isStarted() {
+      return started;
+    },
+    destroy() {
+      startButton.bg.destroy();
+      panel.destroy();
+      overlay.destroy();
+    }
+  };
+}
+
 export function createButton(scene, {
   x,
   y,

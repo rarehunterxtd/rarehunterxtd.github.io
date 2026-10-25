@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { addBackdrop, createButton, createPanel, pulseSuccess, UI_COLORS } from '../../ui/gameUi.js';
+import { addBackdrop, createButton, createIntroModal, createPanel, pulseSuccess, UI_COLORS } from '../../ui/gameUi.js';
 
 const assetUrl = (file) => `${import.meta.env.BASE_URL}assets/game4/${file}`;
 
@@ -28,9 +28,12 @@ export default class MiniGame4Scene extends Phaser.Scene {
     this.menuButtonBg = null;
     this.menuButtonText = null;
     this.mainMenuButton = null;
+    this.introModal = null;
+    this.started = false;
   }
 
   preload() {
+    this.load.audio('game4_remove_sound', assetUrl('remove_sound.mp3'));
     this.load.image(VENT_KEY, assetUrl('menfez.png'));
     this.load.image(OBSTACLE_KEY, assetUrl('engel.png'));
     GAZO_KEYS.forEach((key, idx) => {
@@ -42,12 +45,14 @@ export default class MiniGame4Scene extends Phaser.Scene {
     const { width, height } = this.scale;
     this.stageIndex = 0;
     this.completed = false;
+    this.started = false;
+    this.introModal = null;
     this.vents = [];
     this.obstacles = [];
 
     this.backdrop = addBackdrop(this, { color: 0xeaf6f5, accent: UI_COLORS.teal, secondary: UI_COLORS.amber, depth: -200 });
     this.bgFill = this.add.rectangle(0, 0, width, height, 0xeaf6f5, 0.35).setOrigin(0).setDepth(-100);
-    this.eyebrowText = this.add.text(20, 18, 'OYUN 04  •  TEMİZ HAVA', { fontSize: '14px', color: '#147565', fontStyle: 'bold' }).setDepth(50);
+    this.eyebrowText = this.add.text(20, 18, 'OYUN 04  •  GAZO VE MENFEZLER', { fontSize: '14px', color: '#147565', fontStyle: 'bold' }).setDepth(50);
     this.instructionText = this.add.text(width / 2, 54, 'Engelleri sürükleyip menfezlerden uzaklaştır.', {
       fontSize: '20px',
       color: '#17324d',
@@ -99,7 +104,7 @@ export default class MiniGame4Scene extends Phaser.Scene {
       fill: UI_COLORS.paper, stroke: 0xb8d8c6, radius: 24, shadowAlpha: 0.24
     });
     this.completionText = this.add.text(0, -42, '✓  Tebrikler!', { fontSize: '30px', color: '#2f7c50', fontStyle: 'bold' }).setOrigin(0.5);
-    const body = this.add.text(0, 6, 'Tüm engeller kaldırıldı.', {
+    const body = this.add.text(0, 6, 'Menfezlerin önündeki tüm engeller kaldırıldı.\n Artık GAZO rahat nefes alabilir.', {
       fontSize: '18px',
       color: '#49657d'
     }).setOrigin(0.5);
@@ -114,7 +119,7 @@ export default class MiniGame4Scene extends Phaser.Scene {
     this.menuButtonText = completeButton.text;
 
     this.input.on('dragstart', (pointer, gameObject) => {
-      if (this.completed || !gameObject || gameObject.getData('removed')) return;
+      if (this.completed || !this.started || !gameObject || gameObject.getData('removed')) return;
       gameObject.setDepth(50);
       gameObject.setAlpha(1);
       gameObject.setData('dragStartX', gameObject.x);
@@ -124,7 +129,7 @@ export default class MiniGame4Scene extends Phaser.Scene {
     });
 
     this.input.on('drag', (pointer, gameObject) => {
-      if (this.completed || !gameObject || gameObject.getData('removed')) return;
+      if (this.completed || !this.started || !gameObject || gameObject.getData('removed')) return;
       const worldX = pointer.worldX ?? pointer.x;
       const worldY = pointer.worldY ?? pointer.y;
       const offsetX = gameObject.getData('pointerOffsetX') || 0;
@@ -134,7 +139,7 @@ export default class MiniGame4Scene extends Phaser.Scene {
     });
 
     this.input.on('dragend', (pointer, gameObject) => {
-      if (this.completed || !gameObject || gameObject.getData('removed')) return;
+      if (this.completed || !this.started || !gameObject || gameObject.getData('removed')) return;
 
       const homeX = gameObject.getData('homeX');
       const homeY = gameObject.getData('homeY');
@@ -184,6 +189,15 @@ export default class MiniGame4Scene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this._onShutdown, this);
 
     this._onResize(width, height);
+
+    this.introModal = createIntroModal(this, {
+      title: 'Oyun 4 - GAZO ve Menfezler',
+      body: 'Karakterimiz GAZO nefes almakta zorlanıyor! Bu mini oyunda, menfezlerin önündeki engelleri sürükleyip menfezlerden uzaklaştırman gerekiyor. Tüm engelleri kaldırarak GAZO\'nun güvenli bir şekilde nefes almasını sağla!',
+      fill: UI_COLORS.teal,
+      stroke: 0xb8f7e4,
+      onStart: () => { this.started = true; }
+    });
+    this.introModal.resize(width, height);
   }
 
   _forceEndPointerDrag(pointer) {
@@ -200,6 +214,7 @@ export default class MiniGame4Scene extends Phaser.Scene {
   _advanceStage() {
     if (this.completed) return;
 
+    this.sound.play('game4_remove_sound');
     this.stageIndex = Math.min(this.stageIndex + 1, GAZO_KEYS.length - 1);
     const nextKey = GAZO_KEYS[this.stageIndex];
     if (this.gazo && this.textures.exists(nextKey)) {
@@ -238,10 +253,15 @@ export default class MiniGame4Scene extends Phaser.Scene {
   }
 
   _onShutdown() {
+    this.input.removeAllListeners('dragstart');
+    this.input.removeAllListeners('drag');
+    this.input.removeAllListeners('dragend');
     if (this._resizeHandler) {
       this.scale.off('resize', this._resizeHandler);
       this._resizeHandler = null;
     }
+    this.introModal?.destroy();
+    this.introModal = null;
   }
 
   _onResize(width, height) {
@@ -328,5 +348,6 @@ export default class MiniGame4Scene extends Phaser.Scene {
       this.mainMenuButton.rect.setPosition(mx, my);
       this.mainMenuButton.txt.setPosition(mx, my).setFontSize(compact ? 13 : 15);
     }
+    this.introModal?.resize(width, height);
   }
 }

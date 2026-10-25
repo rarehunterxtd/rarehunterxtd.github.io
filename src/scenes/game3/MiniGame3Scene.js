@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { addBackdrop, createButton, createPanel, pulseSuccess, shakeSoft, UI_COLORS } from '../../ui/gameUi.js';
+import { addBackdrop, createButton, createIntroModal, createPanel, pulseSuccess, shakeSoft, UI_COLORS } from '../../ui/gameUi.js';
 
 const assetUrl = (file) => `${import.meta.env.BASE_URL}assets/game3/${file}`;
 const ICON_KEY_PREFIX = 'game3_icon_';
@@ -22,9 +22,13 @@ export default class MiniGame3Scene extends Phaser.Scene {
     this.slots = [];
     this.completed = false;
     this.draggingCard = null;
+    this.introModal = null;
+    this.started = false;
   }
 
   preload() {
+    this.load.audio('game3_correct_answer', assetUrl('correct_answer.mp3'));
+    this.load.audio('game3_wrong_answer', assetUrl('wrong_answer.mp3'));
     OPTIONS.forEach(({ icon }) => {
       const key = `${ICON_KEY_PREFIX}${icon}`;
       if (!this.textures.exists(key)) {
@@ -39,6 +43,8 @@ export default class MiniGame3Scene extends Phaser.Scene {
     this.slots = [];
     this.completed = false;
     this.draggingCard = null;
+    this.started = false;
+    this.introModal = null;
 
     this.backdrop = addBackdrop(this, {
       color: 0xfff7ef,
@@ -47,7 +53,7 @@ export default class MiniGame3Scene extends Phaser.Scene {
       depth: -200
     });
 
-    this.eyebrowText = this.add.text(20, 18, 'OYUN 03  •  ACİL DURUM', {
+    this.eyebrowText = this.add.text(20, 18, 'OYUN 03  •  GAZ KAÇAĞI', {
       fontSize: '14px',
       color: '#b94f3c',
       fontStyle: 'bold'
@@ -97,7 +103,15 @@ export default class MiniGame3Scene extends Phaser.Scene {
     // Sahne doğrudan mobil ölçüde açıldığında da responsive yazı ve düğme
     // boyutlarını ilk kareden önce uygula.
     this._onResize(width, height, false);
-    this._animateEntrance();
+
+    this.introModal = createIntroModal(this, {
+      title: 'Oyun 3 - Gaz Kaçağı',
+      body: 'Mutfakta doğal gaz kokusu aldın! Bu mini oyunda, güvenli adımları doğru sırayla sürükleyerek yerleştirmen gerekiyor. Adımları doğru sırayla yerleştirerek gaz kaçağını durdur!',
+      fill: UI_COLORS.coral,
+      stroke: 0xf0c4ba,
+      onStart: () => this._startGame()
+    });
+    this.introModal.resize(width, height);
 
     this.input.on('dragstart', this._handleDragStart, this);
     this.input.on('drag', this._handleDrag, this);
@@ -106,6 +120,12 @@ export default class MiniGame3Scene extends Phaser.Scene {
     this._resizeHandler = (gameSize) => this._onResize(gameSize.width, gameSize.height);
     this.scale.on('resize', this._resizeHandler);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this._onShutdown, this);
+  }
+
+  _startGame() {
+    if (this.started) return;
+    this.started = true;
+    this._animateEntrance();
   }
 
   _createCard(option, index) {
@@ -192,7 +212,7 @@ export default class MiniGame3Scene extends Phaser.Scene {
 
   _handleDragStart(pointer, object) {
     const card = object.getData('card');
-    if (!card || card.getData('placed') || this.completed) return;
+    if (!card || card.getData('placed') || this.completed || !this.started) return;
     this.draggingCard = card;
     this.tweens.killTweensOf(card);
     card.setDepth(1000).setScale(1.045);
@@ -202,7 +222,7 @@ export default class MiniGame3Scene extends Phaser.Scene {
 
   _handleDrag(pointer, object) {
     const card = object.getData('card');
-    if (!card || card !== this.draggingCard || this.completed) return;
+    if (!card || card !== this.draggingCard || this.completed || !this.started) return;
     card.setPosition(
       pointer.worldX - card.getData('dragOffsetX'),
       pointer.worldY - card.getData('dragOffsetY')
@@ -211,7 +231,7 @@ export default class MiniGame3Scene extends Phaser.Scene {
 
   _handleDragEnd(pointer, object) {
     const card = object.getData('card');
-    if (!card || card !== this.draggingCard || this.completed) return;
+    if (!card || card !== this.draggingCard || this.completed || !this.started) return;
     this.draggingCard = null;
     const activeSlot = this.slots.find((slot) => slot.getData('active') && !slot.getData('occupied'));
 
@@ -223,6 +243,7 @@ export default class MiniGame3Scene extends Phaser.Scene {
     if (card.getData('id') !== activeSlot.getData('requiredId')) {
       const option = card.getData('option');
       const belongsLater = REQUIRED_ORDER.includes(card.getData('id'));
+      this.sound.play('game3_wrong_answer');
       this._showError(belongsLater
         ? 'Bu güvenli bir adım, ama sırası henüz gelmedi.'
         : (option.wrongMsg || 'Bu davranış güvenli değil. Başka bir kart dene.'));
@@ -249,6 +270,7 @@ export default class MiniGame3Scene extends Phaser.Scene {
   }
 
   _placeCard(card, slot, hitZone) {
+    this.sound.play('game3_correct_answer');
     card.setData('placed', true);
     slot.setData('occupied', true);
     slot.setData('active', false);
@@ -260,7 +282,7 @@ export default class MiniGame3Scene extends Phaser.Scene {
       targets: card,
       x: slot.x,
       y: slot.y,
-      scale: 0.72,
+      scale: 1,
       duration: 190,
       ease: 'Back.easeOut',
       onComplete: () => pulseSuccess(this, [card])
@@ -365,8 +387,8 @@ export default class MiniGame3Scene extends Phaser.Scene {
     const slotColumns = compact ? 2 : 4;
     const slotRows = Math.ceil(this.slots.length / slotColumns);
     const slotGapX = compact ? 18 : Math.max(22, Math.round(width * 0.025));
-    const slotWidth = Math.round(Math.min(210, (width - margin * 2 - slotGapX * (slotColumns - 1)) / slotColumns));
-    const slotHeight = Math.round(slotWidth * 0.58);
+    const slotWidth = cardWidth;
+    const slotHeight = cardHeight;
     const slotGapY = compact ? 16 : 0;
     const totalSlotsWidth = slotColumns * slotWidth + (slotColumns - 1) * slotGapX;
     const slotStartX = width / 2 - totalSlotsWidth / 2 + slotWidth / 2;
@@ -419,7 +441,7 @@ export default class MiniGame3Scene extends Phaser.Scene {
       radius: 24,
       shadowAlpha: 0.24
     });
-    const title = this.add.text(0, -56, '✓  Harika, doğru sıralama!', {
+    const title = this.add.text(0, -56, '✓  Tebrikler!', {
       fontSize: '27px',
       color: '#2f7c50',
       fontStyle: 'bold',
@@ -488,6 +510,7 @@ export default class MiniGame3Scene extends Phaser.Scene {
     this.completionOverlay?.setDisplaySize(width, height).setPosition(0, 0);
     this.completionPanel?.setPosition(width / 2, height / 2);
     this.completionButton?.bg.setPosition(width / 2, height / 2 + 70);
+    this.introModal?.resize(width, height);
     this._layout(width, height, animate);
   }
 
@@ -499,5 +522,7 @@ export default class MiniGame3Scene extends Phaser.Scene {
       this.scale.off('resize', this._resizeHandler);
       this._resizeHandler = null;
     }
+    this.introModal?.destroy();
+    this.introModal = null;
   }
 }

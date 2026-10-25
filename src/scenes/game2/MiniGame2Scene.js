@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { createButton, createPanel, pulseSuccess, UI_COLORS } from '../../ui/gameUi.js';
+import { addBackdrop, createButton, createIntroModal, createPanel, pulseSuccess, UI_COLORS } from '../../ui/gameUi.js';
 
 const assetUrl = (file) => `${import.meta.env.BASE_URL}assets/game2/${file}`;
 
@@ -44,6 +44,7 @@ export default class MiniGame2Scene extends Phaser.Scene {
     this.itemState = {};
     this.completed = false;
     this.titleText = null;
+    this.eyebrowText = null;
     this.mainMenuButton = null;
     this.completionOverlay = null;
     this.completionPanel = null;
@@ -56,12 +57,17 @@ export default class MiniGame2Scene extends Phaser.Scene {
     this._backgroundPointerHandler = null;
     this._layoutWidth = 0;
     this._layoutHeight = 0;
+    this.backdrop = null;
+    this.mediaFrame = null;
+    this.introModal = null;
+    this.started = false;
   }
 
   preload() {
     // Background (user will place actual image at this path)
     // Load from public/assets with BASE_URL so subpath deployments are supported
     this.load.image('game2_bg', assetUrl('background.png'));
+    this.load.audio('game2_pick_sound', assetUrl('pick_sound.mp3'));
 
     // Load item image pairs from ITEM_DEFS
     Object.keys(ITEM_DEFS).forEach((id) => {
@@ -80,6 +86,8 @@ export default class MiniGame2Scene extends Phaser.Scene {
     this.itemSprites = {};
     this.itemState = {};
     this.completed = false;
+    this.started = false;
+    this.introModal = null;
     // Scene nesnesi yeniden kullanılır. Önceki çalıştırmada Phaser tarafından
     // yok edilen başlık/düğme referansları kalırsa ilk responsive yerleşim
     // bunları güncellemeye çalışıp create akışını yarıda kesebilir.
@@ -98,10 +106,25 @@ export default class MiniGame2Scene extends Phaser.Scene {
     this._layoutWidth = 0;
     this._layoutHeight = 0;
 
-    // Match Mini Game 1's warm navy letterbox/pillarbox color.
-    this.bgFill = this.add.rectangle(0, 0, this.scale.width, this.scale.height, 0x102a3d).setOrigin(0).setDepth(-100);
-    // Background image (keep reference so we can resize it later). Centered
-    this.bg = this.add.image(Math.round(this.scale.width / 2), Math.round(this.scale.height / 2), 'game2_bg').setOrigin(0.5).setDepth(-50);
+    this.backdrop = addBackdrop(this, {
+      color: 0x102a3d,
+      accent: UI_COLORS.blue,
+      secondary: UI_COLORS.teal,
+      depth: -220
+    });
+    const mediaBounds = this._getMediaBounds(this.scale.width, this.scale.height);
+    this.mediaFrame = createPanel(this, mediaBounds.x, mediaBounds.y, mediaBounds.width + 16, mediaBounds.height + 16, {
+      fill: 0x0b1f30,
+      fillAlpha: 0.96,
+      stroke: 0x9ccbd2,
+      strokeAlpha: 0.48,
+      lineWidth: 2,
+      radius: 28,
+      shadowAlpha: 0.18,
+      shadowY: 7,
+      depth: -5
+    });
+    this.bg = this.add.image(Math.round(this.scale.width / 2), Math.round(this.scale.height / 2), 'game2_bg').setOrigin(0.5).setDepth(-4);
 
     // Info box (hidden initially)
     this.infoBox = this.add.container(this.scale.width / 2, Math.round(this.scale.height * 0.12)).setDepth(100).setVisible(false);
@@ -128,7 +151,7 @@ export default class MiniGame2Scene extends Phaser.Scene {
       color: '#2f7c50',
       fontStyle: 'bold'
     }).setOrigin(0.5);
-    this.completionBody = this.add.text(0, 0, 'Tüm tehlikeleri buldun ve Mini Oyun 2 tamamlandı.', {
+    this.completionBody = this.add.text(0, 0, 'Mutfaktaki tüm tehlikeleri buldun.', {
       fontSize: '18px',
       color: '#49657d',
       align: 'center',
@@ -180,9 +203,11 @@ export default class MiniGame2Scene extends Phaser.Scene {
     };
     this.input.on('pointerdown', this._backgroundPointerHandler);
 
-    // Title text
-    this.titleText = this.add.text(20, 20, 'Tehlikeyi Bul - Mini Oyun', {
-      fontSize: '22px', color: '#fff', fontStyle: 'bold'
+    // Game title, matching the compact eyebrow used by Mini Game 3.
+    this.eyebrowText = this.add.text(20, 18, 'OYUN 02  •  TEHLİKEYİ BUL', {
+      fontSize: '14px',
+      color: '#b8f7e4',
+      fontStyle: 'bold'
     }).setDepth(300);
 
     const menuButton = createButton(this, {
@@ -194,6 +219,14 @@ export default class MiniGame2Scene extends Phaser.Scene {
 
     // Başlık ve menü butonu oluşturulduktan sonra mobil üst barı da yerleştir.
     this.resizeElements(this.scale.width, this.scale.height);
+    this.introModal = createIntroModal(this, {
+      title: 'Oyun 2 - Tehlikeyi Bul',
+      body: 'Bu mini oyunda, mutfaktaki tehlikeleri bulman gerekiyor. Tehlikeli durumları tespit edip üzerine tıklayarak güvenli bir ortam sağla!',
+      fill: UI_COLORS.teal,
+      stroke: 0xb8f7e4,
+      onStart: () => { this.started = true; }
+    });
+    this.introModal.resize(this.scale.width, this.scale.height);
   }
 
   _onShutdown() {
@@ -206,6 +239,8 @@ export default class MiniGame2Scene extends Phaser.Scene {
       this.input.off('pointerdown', this._backgroundPointerHandler);
       this._backgroundPointerHandler = null;
     }
+    this.introModal?.destroy();
+    this.introModal = null;
     this.cameraSyncFrames = 0;
     window.__refreshGameViewport?.();
   }
@@ -262,13 +297,14 @@ export default class MiniGame2Scene extends Phaser.Scene {
   }
 
   handleItemClick(sprite) {
-    if (this.completed) return;
+    if (this.completed || !this.started) return;
     const id = sprite.getData('id');
     if (this.itemState[id]) return; // already fixed
 
     // Swap texture to 'clicked' version
     sprite.setTexture(sprite.getData('onKey'));
     this.itemState[id] = true;
+    this.sound.play('game2_pick_sound');
 
     // Show info box with description
     this.infoText.setText(sprite.getData('desc'));
@@ -294,24 +330,21 @@ export default class MiniGame2Scene extends Phaser.Scene {
     const compact = width < 620;
     const portraitLayout = compact && height > width * 1.2;
 
-    // Background
-    let bgDisplayW = width;
-    let bgDisplayH = height;
-    let bgCenterX = Math.round(width / 2);
-    let bgCenterY = Math.round(height / 2);
+    // Keep the scene image inside the same framed media area as Mini Game 1.
+    const mediaBounds = this._getMediaBounds(width, height);
+    let bgDisplayW = mediaBounds.width;
+    let bgDisplayH = mediaBounds.height;
+    let bgCenterX = mediaBounds.x;
+    let bgCenterY = mediaBounds.y;
     if (this.bg) {
       const tex = this.textures.get('game2_bg');
       const src = tex && tex.getSourceImage ? tex.getSourceImage() : null;
       if (src && src.width && src.height) {
         const ow = src.width;
         const oh = src.height;
-        // fit inside viewport, preserve aspect ratio -> show black bars for leftover
-        const scale = Math.min(width / ow, height / oh);
+        const scale = Math.min(mediaBounds.width / ow, mediaBounds.height / oh);
         bgDisplayW = Math.round(ow * scale);
         bgDisplayH = Math.round(oh * scale);
-        if (portraitLayout) {
-          bgCenterY = Math.round(76 + bgDisplayH / 2);
-        }
         this.bg.setDisplaySize(bgDisplayW, bgDisplayH);
         this.bg.setPosition(bgCenterX, bgCenterY);
         this.bg.setOrigin(0.5);
@@ -329,6 +362,10 @@ export default class MiniGame2Scene extends Phaser.Scene {
     const bgLeft = Math.round(bgCenterX - bgDisplayW / 2);
     const bgTop = Math.round(bgCenterY - bgDisplayH / 2);
 
+    this.backdrop?.resize(width, height);
+    this.mediaFrame?.setPosition(mediaBounds.x, mediaBounds.y);
+    this.mediaFrame?.resizePanel(mediaBounds.width + 16, mediaBounds.height + 16);
+
     // Info box position and size
     if (this.infoBox && this.infoBg && this.infoText) {
       const boxW = Math.min(700, Math.round(width * 0.9));
@@ -343,12 +380,6 @@ export default class MiniGame2Scene extends Phaser.Scene {
       this.infoText.setPosition(-boxW / 2 + 16, -boxH / 2 + 8);
       this.infoText.setWordWrapWidth(boxW - 40);
       this.infoText.setFontSize(compact ? 15 : 17);
-    }
-
-    // Resize solid background fill to always cover viewport
-    if (this.bgFill) {
-      this.bgFill.setDisplaySize(width, height);
-      this.bgFill.setPosition(0, 0);
     }
 
     // Update each item position & scale relative to the background image
@@ -368,11 +399,10 @@ export default class MiniGame2Scene extends Phaser.Scene {
       sprite.setScale(scale);
     });
 
-    if (this.titleText) {
-      this.titleText
-        .setText(compact ? 'Tehlikeyi Bul' : 'Tehlikeyi Bul - Mini Oyun')
-        .setPosition(compact ? 14 : 20, compact ? 22 : 20)
-        .setFontSize(compact ? 17 : 22);
+    if (this.eyebrowText) {
+      this.eyebrowText
+        .setPosition(compact ? 14 : 20, compact ? 16 : 18)
+        .setFontSize(compact ? 11 : 14);
     }
 
     if (this.mainMenuButton) {
@@ -387,6 +417,8 @@ export default class MiniGame2Scene extends Phaser.Scene {
         .setPosition(mx, my)
         .setFontSize(compact ? 12 : 15);
     }
+
+    this.introModal?.resize(width, height);
 
     if (this.completionOverlay) {
       this.completionOverlay.setDisplaySize(width, height);
@@ -405,6 +437,25 @@ export default class MiniGame2Scene extends Phaser.Scene {
     }
     this.completionButton?.bg.setPosition(Math.round(width / 2), Math.round(height / 2 + 72));
     this.completionButton?.text.setPosition(Math.round(width / 2), Math.round(height / 2 + 72));
+  }
+
+  _getMediaBounds(width, height) {
+    const compact = width < 620;
+    const top = compact ? 72 : 18;
+    const bottomReserve = compact ? 222 : 112;
+    const maxWidth = Math.max(260, width - (compact ? 24 : 40));
+    const maxHeight = Math.max(160, height - top - bottomReserve);
+    const aspect = 16 / 9;
+    const mediaWidth = Math.min(maxWidth, maxHeight * aspect);
+    const mediaHeight = mediaWidth / aspect;
+    const x = Math.round(width / 2);
+    const y = Math.round(top + maxHeight / 2);
+    return {
+      x,
+      y,
+      width: Math.round(mediaWidth),
+      height: Math.round(mediaHeight)
+    };
   }
 
   _showCompletionUI() {
