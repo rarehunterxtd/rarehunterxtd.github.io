@@ -14,6 +14,15 @@ const VENT_LAYOUT = [
   { x: 0.72, y: 0.72 }
 ];
 
+// GAZO'nun oksijen seviyesi: düşük başlar, kapalı menfezler yüzünden yavaşça azalır,
+// her açılan menfez seviyeyi artırır.
+const OXYGEN_START = 20;
+const OXYGEN_PER_VENT = 20;
+const OXYGEN_MIN = 8;
+const OXYGEN_DRAIN_PER_CLOSED_VENT_PER_SEC = 0.25;
+const OXYGEN_LOW = 30;
+const OXYGEN_MID = 70;
+
 export default class MiniGame4Scene extends Phaser.Scene {
   constructor() {
     super('MiniGame4');
@@ -30,6 +39,9 @@ export default class MiniGame4Scene extends Phaser.Scene {
     this.mainMenuButton = null;
     this.introModal = null;
     this.started = false;
+    this.oxygen = OXYGEN_START;
+    this.oxygenDisplay = OXYGEN_START;
+    this.oxygenMeter = null;
   }
 
   preload() {
@@ -49,11 +61,13 @@ export default class MiniGame4Scene extends Phaser.Scene {
     this.introModal = null;
     this.vents = [];
     this.obstacles = [];
+    this.oxygen = OXYGEN_START;
+    this.oxygenDisplay = OXYGEN_START;
 
     this.backdrop = addBackdrop(this, { color: 0xeaf6f5, accent: UI_COLORS.teal, secondary: UI_COLORS.amber, depth: -200 });
     this.bgFill = this.add.rectangle(0, 0, width, height, 0xeaf6f5, 0.35).setOrigin(0).setDepth(-100);
     this.eyebrowText = this.add.text(20, 18, 'OYUN 04  •  GAZO VE MENFEZLER', { fontSize: '14px', color: '#147565', fontStyle: 'bold' }).setDepth(50);
-    this.instructionText = this.add.text(width / 2, 54, 'Engelleri sürükleyip menfezlerden uzaklaştır.', {
+    this.instructionText = this.add.text(width / 2, 54, 'Engelleri sürükleyip menfezleri aç, GAZO\'nun oksijenini doldur!', {
       fontSize: '20px',
       color: '#17324d',
       fontStyle: 'bold',
@@ -99,14 +113,17 @@ export default class MiniGame4Scene extends Phaser.Scene {
       this.obstacles.push(obstacle);
     });
 
+    this._createOxygenMeter();
+
     this.completionPanel = this.add.container(width / 2, height / 2).setDepth(1000).setVisible(false);
     const panelBg = createPanel(this, 0, 0, Math.min(440, width - 40), 230, {
       fill: UI_COLORS.paper, stroke: 0xb8d8c6, radius: 24, shadowAlpha: 0.24
     });
     this.completionText = this.add.text(0, -42, '✓  Tebrikler!', { fontSize: '30px', color: '#2f7c50', fontStyle: 'bold' }).setOrigin(0.5);
-    const body = this.add.text(0, 6, 'Menfezlerin önündeki tüm engeller kaldırıldı.\n Artık GAZO rahat nefes alabilir.', {
+    const body = this.add.text(0, 6, 'Tüm menfezler açıldı, GAZO\'nun oksijeni %100!\nArtık rahat nefes alıyor ve çok güçlü.', {
       fontSize: '18px',
-      color: '#49657d'
+      color: '#49657d',
+      align: 'center'
     }).setOrigin(0.5);
     this.completionPanel.add([panelBg, this.completionText, body]);
     const completeButton = createButton(this, {
@@ -161,7 +178,7 @@ export default class MiniGame4Scene extends Phaser.Scene {
           }
         });
 
-        this._advanceStage();
+        this._advanceStage(homeX, homeY);
       } else {
         this._forceEndPointerDrag(pointer);
         this.tweens.add({
@@ -176,10 +193,7 @@ export default class MiniGame4Scene extends Phaser.Scene {
         });
       }
 
-      gameObject.removeData('pointerOffsetX');
-      gameObject.removeData('pointerOffsetY');
-      gameObject.removeData('dragStartX');
-      gameObject.removeData('dragStartY');
+      gameObject.data?.remove(['pointerOffsetX', 'pointerOffsetY', 'dragStartX', 'dragStartY']);
     });
 
     this._resizeHandler = (gameSize) => {
@@ -192,7 +206,7 @@ export default class MiniGame4Scene extends Phaser.Scene {
 
     this.introModal = createIntroModal(this, {
       title: 'Oyun 4 - GAZO ve Menfezler',
-      body: 'Karakterimiz GAZO nefes almakta zorlanıyor! Bu mini oyunda, menfezlerin önündeki engelleri sürükleyip menfezlerden uzaklaştırman gerekiyor. Tüm engelleri kaldırarak GAZO\'nun güvenli bir şekilde nefes almasını sağla!',
+      body: 'Karakterimiz GAZO nefes almakta zorlanıyor! Menfezler kapalı olduğu için oksijeni azalıyor. Menfezlerin önündeki engelleri sürükleyip uzaklaştır; açtığın her menfez GAZO\'nun oksijenini artırır. Tüm menfezleri açarak oksijeni %100\'e çıkar ve GAZO\'yu güçlendir!',
       fill: UI_COLORS.teal,
       stroke: 0xb8f7e4,
       onStart: () => { this.started = true; }
@@ -211,10 +225,129 @@ export default class MiniGame4Scene extends Phaser.Scene {
     }
   }
 
-  _advanceStage() {
+  update(time, delta) {
+    if (!this.oxygenMeter) return;
+
+    if (this.started && !this.completed) {
+      // Kaldırılan engeller destroy edildiği için her açılan menfezde artan stageIndex üzerinden sayılır
+      const closedVents = Math.max(0, this.obstacles.length - this.stageIndex);
+      const drain = (OXYGEN_DRAIN_PER_CLOSED_VENT_PER_SEC * closedVents * delta) / 1000;
+      this.oxygen = Math.max(OXYGEN_MIN, this.oxygen - drain);
+    }
+
+    const diff = this.oxygen - this.oxygenDisplay;
+    if (Math.abs(diff) > 0.05) {
+      this.oxygenDisplay += diff * Math.min(1, delta / 180);
+    } else {
+      this.oxygenDisplay = this.oxygen;
+    }
+
+    this._drawOxygenMeter(time);
+  }
+
+  _createOxygenMeter() {
+    const panel = createPanel(this, 0, 0, 360, 72, {
+      fill: UI_COLORS.paper, stroke: 0xb8d8c6, radius: 20, shadowAlpha: 0.12, depth: 60
+    });
+    const label = this.add.text(0, 0, 'GAZO\'nun Oksijeni', {
+      fontSize: '15px', color: '#17324d', fontStyle: 'bold'
+    }).setOrigin(0, 0.5).setDepth(61);
+    const valueText = this.add.text(0, 0, '%20', {
+      fontSize: '18px', color: '#17324d', fontStyle: 'bold'
+    }).setOrigin(1, 0.5).setDepth(61);
+    const statusText = this.add.text(0, 0, '', {
+      fontSize: '13px', color: '#49657d'
+    }).setOrigin(0.5, 0.5).setDepth(61);
+    const bar = this.add.graphics().setDepth(61);
+
+    this.oxygenMeter = { panel, label, valueText, statusText, bar, x: 0, y: 0, width: 360, height: 72 };
+  }
+
+  _layoutOxygenMeter(width, height, compact) {
+    const meter = this.oxygenMeter;
+    if (!meter) return;
+    meter.width = Math.min(compact ? 320 : 380, width - 32);
+    meter.height = compact ? 66 : 72;
+    meter.x = Math.round(width / 2);
+    meter.y = Math.round(height - meter.height / 2 - (compact ? 14 : 18));
+
+    const left = meter.x - meter.width / 2 + 18;
+    const right = meter.x + meter.width / 2 - 18;
+    const top = meter.y - meter.height / 2;
+
+    meter.panel.setPosition(meter.x, meter.y).resizePanel(meter.width, meter.height);
+    meter.label.setPosition(left, top + 17).setFontSize(compact ? 13 : 15);
+    meter.valueText.setPosition(right, top + 17).setFontSize(compact ? 16 : 18);
+    meter.statusText.setPosition(meter.x, top + meter.height - 13).setFontSize(compact ? 11 : 13);
+    meter.barLeft = left;
+    meter.barTop = top + 30;
+    meter.barWidth = right - left;
+    meter.barHeight = compact ? 14 : 16;
+    this._drawOxygenMeter(this.time.now);
+  }
+
+  _drawOxygenMeter(time) {
+    const meter = this.oxygenMeter;
+    if (!meter || meter.barWidth === undefined) return;
+
+    const value = Phaser.Math.Clamp(this.oxygenDisplay, 0, 100);
+    const color = value < OXYGEN_LOW ? UI_COLORS.coral : value < OXYGEN_MID ? UI_COLORS.amber : UI_COLORS.green;
+    const radius = meter.barHeight / 2;
+
+    meter.bar.clear();
+    meter.bar.fillStyle(UI_COLORS.line, 1);
+    meter.bar.fillRoundedRect(meter.barLeft, meter.barTop, meter.barWidth, meter.barHeight, radius);
+
+    const fillWidth = Math.max(meter.barHeight, (meter.barWidth * value) / 100);
+    // Oksijen düşükken dolgu "nefes alır" gibi yanıp söner
+    const lowPulse = value < OXYGEN_LOW && !this.completed ? 0.65 + 0.35 * Math.sin(time / 160) : 1;
+    meter.bar.fillStyle(color, lowPulse);
+    meter.bar.fillRoundedRect(meter.barLeft, meter.barTop, fillWidth, meter.barHeight, radius);
+
+    meter.valueText.setText(`%${Math.round(value)}`);
+    meter.valueText.setColor(value < OXYGEN_LOW ? '#c4513c' : value < OXYGEN_MID ? '#b07a12' : '#2f7c50');
+
+    const status = value >= 99
+      ? 'GAZO çok güçlü ve rahat nefes alıyor!'
+      : value >= OXYGEN_MID
+        ? 'GAZO güçleniyor, az kaldı!'
+        : value >= OXYGEN_LOW
+          ? 'GAZO biraz rahatladı, devam et!'
+          : 'Menfezler kapalı, GAZO zor nefes alıyor!';
+    if (meter.statusText.text !== status) meter.statusText.setText(status);
+  }
+
+  _showOxygenGain(x, y, amount) {
+    const meter = this.oxygenMeter;
+    const gain = this.add.text(x, y, `+%${amount} Oksijen`, {
+      fontSize: '18px', color: '#2f7c50', fontStyle: 'bold', stroke: '#ffffff', strokeThickness: 4
+    }).setOrigin(0.5).setDepth(80);
+
+    this.tweens.add({
+      targets: gain,
+      x: meter ? meter.x : x,
+      y: meter ? meter.y - meter.height / 2 : y - 60,
+      alpha: { from: 1, to: 0.2 },
+      duration: 700,
+      ease: 'Cubic.easeIn',
+      onComplete: () => {
+        gain.destroy();
+        if (meter) {
+          this.tweens.add({ targets: meter.valueText, scale: 1.25, duration: 120, yoyo: true, ease: 'Sine.easeOut' });
+        }
+      }
+    });
+  }
+
+  _advanceStage(fromX, fromY) {
     if (this.completed) return;
 
     this.sound.play('game4_remove_sound');
+    const isLast = this.stageIndex + 1 >= GAZO_KEYS.length - 1;
+    const before = this.oxygen;
+    this.oxygen = isLast ? 100 : Math.min(100, this.oxygen + OXYGEN_PER_VENT);
+    this._showOxygenGain(fromX ?? this.scale.width / 2, fromY ?? this.scale.height / 2, Math.round(this.oxygen - before));
+
     this.stageIndex = Math.min(this.stageIndex + 1, GAZO_KEYS.length - 1);
     const nextKey = GAZO_KEYS[this.stageIndex];
     if (this.gazo && this.textures.exists(nextKey)) {
@@ -262,6 +395,7 @@ export default class MiniGame4Scene extends Phaser.Scene {
     }
     this.introModal?.destroy();
     this.introModal = null;
+    this.oxygenMeter = null;
   }
 
   _onResize(width, height) {
@@ -329,6 +463,8 @@ export default class MiniGame4Scene extends Phaser.Scene {
       obstacle.setData('homeX', ventX);
       obstacle.setData('homeY', ventY);
     });
+
+    this._layoutOxygenMeter(width, height, compact);
 
     if (this.completionPanel) {
       this.completionPanel.setPosition(Math.round(width / 2), Math.round(height / 2));
