@@ -12,10 +12,18 @@ const NEEDLE_MAX = 90;
 const REQUIRED_SAFE_SECONDS = 20;
 const REQUIRED_INPUTS = 2;
 
+// Kombi görseli (1024x1536) üzerindeki yerleşim, görsel pikselleri cinsinden.
+const BOILER_SIZE = { width: 1024, height: 1536 };
+const BOILER_CONTENT = { left: 222, top: 64, right: 796, bottom: 1408 };
+const BOILER_BODY_HALF_WIDTH = 290;
+const BOILER_SCREEN = { x: 510, y: 530, width: 250 };
+// Gösterge görselinin dolu kısmı genişliğin ~%79'u; bu alan kırmızı bölgeye (x 290-740) oturur.
+const BOILER_METER = { x: 515, y: 841, width: 570 };
+
 export default class MiniGame5Scene extends Phaser.Scene {
   constructor() {
     super('MiniGame5');
-    this.valve = null;
+    this.boiler = null;
     this.pressureMeter = null;
     this.screen = null;
     this.needle = null;
@@ -52,7 +60,7 @@ export default class MiniGame5Scene extends Phaser.Scene {
   preload() {
     this.load.audio('game5_correct_answer', assetUrl('correct_answer.mp3'));
     this.load.audio('game5_wrong_answer', assetUrl('wrong_answer.mp3'));
-    this.load.image('game5_valve', assetUrl('vana.png'));
+    this.load.image('game5_boiler', assetUrl('kombi.webp'));
     this.load.image('game5_pressure_meter', assetUrl('pressure_meter.png'));
     this.load.image('game5_needle', assetUrl('ibre.png'));
     this.load.image('game5_screen_off', assetUrl('screen_off.png'));
@@ -96,7 +104,7 @@ export default class MiniGame5Scene extends Phaser.Scene {
       fontStyle: 'bold'
     }).setOrigin(0.5, 0).setDepth(60);
 
-    this.valve = this.add.image(width / 2, height / 2 + 140, 'game5_valve').setOrigin(0.5).setDepth(12);
+    this.boiler = this.add.image(width / 2, height / 2, 'game5_boiler').setOrigin(0.5).setDepth(5);
     this.pressureMeter = this.add.image(width / 2, height / 2, 'game5_pressure_meter').setOrigin(0.5).setDepth(10);
     this.screen = this.add.image(width / 2, height / 2, 'game5_screen_off').setOrigin(0.5).setDepth(11);
     this.needle = this.add.image(width / 2, height / 2, 'game5_needle').setOrigin(0.5, 1).setDepth(20);
@@ -174,24 +182,9 @@ export default class MiniGame5Scene extends Phaser.Scene {
 
   _nudgeNeedle(delta) {
     if (this.isFinished || !this.started) return;
-    this._animateValve(Math.sign(delta));
     this.inputCount += 1;
     this.angularVelocity += delta * 0.9;
     this.manualForce += delta * 0.35;
-  }
-
-  _animateValve(direction) {
-    if (!this.valve || this.isFinished || direction === 0) return;
-    this.tweens.killTweensOf(this.valve);
-    this.valve.setAngle(0);
-    this.tweens.add({
-      targets: this.valve,
-      angle: direction < 0 ? -30 : 30,
-      duration: 90,
-      ease: 'Sine.Out',
-      yoyo: true,
-      hold: 20
-    });
   }
 
   _stepPhysics(deltaSeconds, elapsedSeconds) {
@@ -342,21 +335,33 @@ export default class MiniGame5Scene extends Phaser.Scene {
       this.feedbackText.setFontSize(compact ? 16 : 18);
     }
 
-    const meterWidth = Math.round(compact
-      ? Math.min(width * 0.86, height * 0.56)
-      : Math.min(width * 0.56, height * 0.72));
+    // Kombi, üst bilgi alanının altındaki boşluğu doldurur. Dar ekranda yön
+    // tuşları kombinin altına, geniş ekranda iki yanına yerleşir.
+    const topReserved = compact ? 100 : 92;
+    const bottomReserved = compact ? 96 : 14;
+    const sideReserved = compact ? 24 : 260;
+    const contentW = BOILER_CONTENT.right - BOILER_CONTENT.left;
+    const contentH = BOILER_CONTENT.bottom - BOILER_CONTENT.top;
+    const boilerScale = Math.max(0.1, Math.min(
+      (height - topReserved - bottomReserved) / contentH,
+      (width - sideReserved) / contentW
+    ));
+    const layoutCenterX = Math.round(width / 2);
+    const layoutCenterY = Math.round(topReserved + (height - topReserved - bottomReserved) / 2);
+    // Görsel pikselini ekran koordinatına çevirir
+    const boilerX = (px) => Math.round(layoutCenterX + (px - (BOILER_CONTENT.left + BOILER_CONTENT.right) / 2) * boilerScale);
+    const boilerY = (py) => Math.round(layoutCenterY + (py - (BOILER_CONTENT.top + BOILER_CONTENT.bottom) / 2) * boilerScale);
+
+    if (this.boiler) {
+      this.boiler.setPosition(boilerX(BOILER_SIZE.width / 2), boilerY(BOILER_SIZE.height / 2));
+      this.boiler.setDisplaySize(Math.round(BOILER_SIZE.width * boilerScale), Math.round(BOILER_SIZE.height * boilerScale));
+    }
+
+    const meterWidth = Math.round(BOILER_METER.width * boilerScale);
     const meterHeight = Math.round(meterWidth * (349 / 667));
     const needleHeight = Math.round(meterHeight * 0.72);
-    const valveWidth = Math.round(meterWidth * (compact ? 0.3 : 0.24));
-    const centerX = Math.round(width / 2);
-    const centerY = Math.round(height * (compact ? 0.39 : 0.48));
-
-    if (this.valve) {
-      const source = this.valve.texture.getSourceImage();
-      const scale = valveWidth / Math.max(1, source.width);
-      this.valve.setPosition(centerX, centerY + Math.round(meterHeight * 0.83));
-      this.valve.setScale(scale);
-    }
+    const centerX = boilerX(BOILER_METER.x);
+    const centerY = boilerY(BOILER_METER.y);
 
     if (this.pressureMeter) {
       this.pressureMeter.setPosition(centerX, centerY);
@@ -364,9 +369,9 @@ export default class MiniGame5Scene extends Phaser.Scene {
     }
 
     if (this.screen) {
-      const screenWidth = Math.round(meterWidth * 0.24);
+      const screenWidth = Math.round(BOILER_SCREEN.width * boilerScale);
       const screenHeight = Math.round(screenWidth * (187 / 307));
-      this.screen.setPosition(centerX, centerY - Math.round(meterHeight * 0.66));
+      this.screen.setPosition(boilerX(BOILER_SCREEN.x), boilerY(BOILER_SCREEN.y));
       this.screen.setDisplaySize(screenWidth, screenHeight);
     }
 
@@ -391,18 +396,19 @@ export default class MiniGame5Scene extends Phaser.Scene {
       this.safeMaxNeedle.setAngle(SAFE_MAX);
     }
 
+    const bodyHalf = Math.round(BOILER_BODY_HALF_WIDTH * boilerScale);
+    const controlsY = compact ? height - Math.round(bottomReserved / 2) : centerY;
+
     if (this.leftButton) {
-      const x = compact ? 58 : centerX - Math.round(meterWidth * 0.68);
-      const controlsY = compact ? centerY + Math.round(meterHeight * 0.83) : centerY;
-      this.leftButton.bg.setDisplaySize(compact ? 58 : 88, compact ? 58 : 88);
+      const x = compact ? layoutCenterX - 80 : layoutCenterX - bodyHalf - 80;
+      this.leftButton.bg.setDisplaySize(compact ? 64 : 88, compact ? 64 : 88);
       this.leftButton.bg.setPosition(x, controlsY);
       this.leftButton.text.setPosition(x, controlsY).setFontSize(compact ? 29 : 38);
     }
 
     if (this.rightButton) {
-      const x = compact ? width - 58 : centerX + Math.round(meterWidth * 0.68);
-      const controlsY = compact ? centerY + Math.round(meterHeight * 0.83) : centerY;
-      this.rightButton.bg.setDisplaySize(compact ? 58 : 88, compact ? 58 : 88);
+      const x = compact ? layoutCenterX + 80 : layoutCenterX + bodyHalf + 80;
+      this.rightButton.bg.setDisplaySize(compact ? 64 : 88, compact ? 64 : 88);
       this.rightButton.bg.setPosition(x, controlsY);
       this.rightButton.text.setPosition(x, controlsY).setFontSize(compact ? 29 : 38);
     }
@@ -413,7 +419,7 @@ export default class MiniGame5Scene extends Phaser.Scene {
     }
 
     if (this.panel) {
-      this.panel.setPosition(centerX, centerY);
+      this.panel.setPosition(layoutCenterX, layoutCenterY);
       const panelBg = this.panel.list?.[0];
       if (panelBg?.resizePanel) {
         const panelW = Math.min(440, width - 40);
@@ -423,8 +429,8 @@ export default class MiniGame5Scene extends Phaser.Scene {
         this.panelBody.setWordWrapWidth(Math.min(340, width - 80));
       }
     }
-    this.panelActionBg?.setPosition(centerX, centerY + 72);
-    this.panelActionText?.setPosition(centerX, centerY + 72);
+    this.panelActionBg?.setPosition(layoutCenterX, layoutCenterY + 72);
+    this.panelActionText?.setPosition(layoutCenterX, layoutCenterY + 72);
 
     if (this.mainMenuButton) {
       const mx = Math.round(width - (compact ? 72 : 90));
